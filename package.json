@@ -1,0 +1,59 @@
+{
+  "name": "ts-express-kit",
+  "version": "1.1.4",
+  "description": "A TypeScript starter kit for building Express applications with best practices.",
+  "main": "index.js",
+  "bin": {
+    "ts-express-kit": "./dist/bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint src --ignore-path .eslintignore --ext .ts",
+    "lint:fix": "npx eslint src --fix",
+    "prettier": "prettier --ignore-path .gitignore --write \"./src/**/*.+(js|ts|json)\"",
+    "prettier:fix": "npx prettier --write src",
+    "dev": "ts-node-dev --respawn --transpile-only ./src/server.ts",
+    "prod": "node ./dist/server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "typescript",
+    "express",
+    "node",
+    "ts-express-kit"
+  ],
+  "author": "Nasim",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nazmulhasannasim333/ts-express-kit.git"
+  },
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.1",
+    "express": "^5.1.0",
+    "http-status": "^2.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.4",
+    "multer": "^2.0.2",
+    "nodemailer": "^7.0.10",
+    "uuid": "^13.0.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.3",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.0.0",
+    "@types/nodemailer": "^7.0.3",
+    "@typescript-eslint/eslint-plugin": "^8.39.0",
+    "@typescript-eslint/parser": "^8.39.0",
+    "eslint": "^9.32.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.6.2",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.9.2"
+  }
+}
