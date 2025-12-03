@@ -28,8 +28,7 @@ router.patch(
   auth(
     USER_ROLE.admin,
     USER_ROLE.superAdmin,
-    USER_ROLE.host,
-    USER_ROLE.thrillseekers
+    USER_ROLE.user
   ),
   validationRequest(UserValidationSchema.ChnagePasswordSchema),
   UserController.chnagePassword

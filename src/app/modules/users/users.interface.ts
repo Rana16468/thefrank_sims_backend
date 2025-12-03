@@ -11,7 +11,7 @@ export interface UserResponse {
 
 export type TUser = {
   id: string;
-  role: 'host' | 'thrillseekers' | 'admin' | 'superAdmin';
+  role:  'user' | 'admin' | 'superAdmin';
   provider?: 'googleAuth'
   name: string;
   subname:string;

@@ -42,14 +42,14 @@ const TUserSchema = new Schema<TUser, UserModel>(
       enum: {
         values: [
           USER_ROLE.admin,
-          USER_ROLE.host,
+          USER_ROLE.user,
           USER_ROLE.superAdmin,
-          USER_ROLE.thrillseekers,
+
         ],
         message: "{VALUE} is Not Required",
       },
       required: [true, "Role is Required"],
-      default: USER_ROLE.thrillseekers,
+      default: USER_ROLE.user,
     },
     provider: {
       type: String,

@@ -45,11 +45,11 @@ const createUserZodSchema = z.object({
     role: z
       .enum([
         USER_ROLE.admin,
-        USER_ROLE.host,
+        USER_ROLE.user,
         USER_ROLE.superAdmin,
-        USER_ROLE.thrillseekers,
+  
       ])
-      .default(USER_ROLE.thrillseekers),
+      .default(USER_ROLE.user),
 
     status: z
       .enum([USER_ACCESSIBILITY.isProgress, USER_ACCESSIBILITY.blocked])
