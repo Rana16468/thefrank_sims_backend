@@ -5,49 +5,49 @@ import config from "./app/config";
 import AppError from "./app/errors/AppError";
 import httpStatus from "http-status";
 
-
 let server: Server;
 
-// Prevent multiple event listener memory leaks
-process.setMaxListeners(1);
+// prevent listener leak warnings
+require("events").EventEmitter.defaultMaxListeners = 20;
 
+// ==============================
+// Global graceful shutdown handlers
+// ==============================
+
+// Handle unexpected promise rejections
+process.on("unhandledRejection", (error) => {
+  console.error("Unhandled Rejection:", error);
+  shutdownServer(1);
+});
+
+// Handle uncaught exceptions
+process.on("uncaughtException", (error) => {
+  console.error("Uncaught Exception:", error);
+  shutdownServer(1);
+});
+
+// Handle OS signals (Manual server stop) - PM2
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received");
+  shutdownServer(0);
+});
+
+process.on("SIGINT", () => {
+  console.log("SIGINT received");
+  shutdownServer(0);
+});
+
+
+// ==============================
+// Main Function
+// ==============================
 async function main() {
   try {
-    // Database Connection
     await mongoose.connect(config.database_url as string);
     console.log("Database connected successfully");
 
-    // Start HTTP Server
     server = app.listen(config.port, () => {
-      console.log(` app listening http://${config.host}:${config.port}`);
-    });
-
-
-    // -------------------------
-    // Graceful Shutdown Handlers
-    // -------------------------
-
-    // Handle unexpected promise rejections
-    process.on("unhandledRejection", (error) => {
-      console.error("Unhandled Rejection:", error);
-      shutdownServer(1);
-    });
-
-    // Handle uncaught exceptions
-    process.on("uncaughtException", (error) => {
-      console.error("Uncaught Exception:", error);
-      shutdownServer(1);
-    });
-
-    // Handle OS signals (Manual server stop)
-    process.on("SIGTERM", () => {
-      console.log("SIGTERM received");
-      shutdownServer(0);
-    });
-
-    process.on("SIGINT", () => {
-      console.log("SIGINT received");
-      shutdownServer(0);
+      console.log(`🚀 Server running on http://${config.host}:${config.port}`);
     });
 
   } catch (error: any) {
@@ -59,7 +59,10 @@ async function main() {
   }
 }
 
-// Unified shutdown logic
+
+// =================================
+// Unified graceful shutdown function
+// =================================
 function shutdownServer(exitCode: number) {
   if (server) {
     server.close(() => {
@@ -71,6 +74,10 @@ function shutdownServer(exitCode: number) {
   }
 }
 
+
+// ==============================
+// Start server
+// ==============================
 main().then(() => {
-  console.log("--thefrank_sims  Server is running ---");
+  console.log("--- Omerabashar Server is running ---");
 });

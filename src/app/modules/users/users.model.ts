@@ -8,9 +8,6 @@ import { TUser, UserModel } from "./users.interface";
 const TUserSchema = new Schema<TUser, UserModel>(
   {
     name: { type: String, required: [true, "user name is Required"] },
-    subname:{
-      type:String, required:[true,'subname is  required'], unique:true, index:true
-    },
     password: { type: String, required: [false, "Password is Required"] },
 
     email: {
@@ -18,6 +15,7 @@ const TUserSchema = new Schema<TUser, UserModel>(
       required: [true, "Email is Required"],
       trim: true,
       unique: true,
+      index:true
     },
     phoneNumber: {
       type: String,
@@ -56,8 +54,7 @@ const TUserSchema = new Schema<TUser, UserModel>(
       enum: {
         values: [socialAuth.googleAuth],
       },
-      required: [true, "provider is Required"],
-      default: socialAuth.googleAuth,
+      required: [false, "provider is Required"]
     },
     status: {
       type: String,
@@ -82,10 +79,9 @@ const TUserSchema = new Schema<TUser, UserModel>(
     },
     isStripeConnected: {
       type: Boolean,
-      rquired: false,
-      default: false,
+      rquired: false
     },
-    address: {
+   location: {
       type: String,
       required: [false, "address is not required"],
     },
@@ -93,6 +89,11 @@ const TUserSchema = new Schema<TUser, UserModel>(
       type: String,
       required: [false, "fcm is not  required"],
       default: null,
+    },
+    recoveryKey:{
+      type:String, 
+      required:[false ,'recoveryKey is required'],
+
     },
     isDelete: {
       type: Boolean,

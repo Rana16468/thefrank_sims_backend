@@ -17,7 +17,7 @@ const generateUniqueOTP = async (): Promise<number> => {
   const MAX_ATTEMPTS = 10;
 
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
-    const otp = Math.floor(100000 + Math.random() * 900000);
+    const otp = Math.floor(1000 + Math.random() * 9000); // 4 digit
 
     const existingUser = await users.findOne({ verificationCode: otp });
 
@@ -28,74 +28,76 @@ const generateUniqueOTP = async (): Promise<number> => {
 
   throw new AppError(
     httpStatus.NOT_EXTENDED,
-    "Failed to generate a unique OTP after multiple attempts",
+    "Failed to generate a unique 4 digit OTP after multiple attempts",
     ""
   );
 };
 
 
+
 const createUserIntoDb = async (payload: TUser) => {
-  const session = await mongoose.startSession();
-  session.startTransaction();
-
   try {
-    const otp = await generateUniqueOTP();
+    // Normalize email to lowercase
+    const email = payload.email;
 
-    const isExistUser = await users.findOne({
-      email: payload?.email,
-      isDelete: false,
-    });
-
-    if (isExistUser) {
+    // Check if user already exists
+    const existingUser = await users.findOne({ email });
+    if (existingUser) {
       throw new AppError(
-        httpStatus.CONFLICT, // 409
-        'This email already exists in our database',
-        '',
+        httpStatus.CONFLICT,
+        'This email already exists in our database'
       );
     }
 
-    payload.verificationCode = otp;
-    // create   unique subname 
+    // Generate unique OTP
+    const otp = await generateUniqueOTP();
 
-    payload.subname = `${payload.name.toLowerCase().replace(/\s+/g, "_")}_${Math.floor(1000 + Math.random() * 9000)}`;
+    // Prepare user payload
+    const newUserData = {
+      ...payload,
+      email,
+      verificationCode: otp,
+      // TODO: generate unique subname if needed
+    };
 
-
-    const authBuilder = new users(payload);
-    const result = await authBuilder.save({ session });
-    if(!result){
-      throw new  AppError(httpStatus.NOT_EXTENDED,'issues  by the information recorded  section server')
+    // Save user
+    const newUser = new users(newUserData);
+    const result = await newUser.save();
+    if (!result) {
+      throw new AppError(
+        httpStatus.NOT_EXTENDED,
+        'Failed to record user information'
+      );
     }
 
-    await session.commitTransaction();
-    session.endSession();
+    // Send verification email (wrap in try-catch to avoid user left in DB)
+    try {
+      await sendEmail(
+        email,
+        emailContext.sendVerificationData(email, otp, 'User Verification Email'),
+        'Verification OTP Code'
+      );
+    } catch (emailError) {
+      console.error('Email sending failed:', emailError);
+      // Optionally, delete user or mark as unverified
+      // await users.deleteOne({ _id: result._id });
+    }
 
-    // Send email AFTER successful commit
-    await sendEmail(
-      payload.email,
-      emailContext.sendVerificationData(
-        payload.email,
-        otp,
-        'User Verification Email',
-      ),
-      'Verification OTP Code',
-    );
-
-    return { status: true, message: 'Check your email inbox for verification code' };
+    return {
+      status: true,
+      message: 'Check your email inbox for verification code'
+    };
   } catch (error: any) {
-    await session.abortTransaction();
-    session.endSession();
+    if (error instanceof AppError) throw error;
 
-    if (error instanceof AppError) {
-      throw error; // preserve custom error
-    }
-
+    console.error('Unexpected server error:', error);
     throw new AppError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      'Unexpected server error',
-      error,
+      'Unexpected server error'
     );
   }
 };
+
 
 
 const userVarificationIntoDb = async (verificationCode: number) => {

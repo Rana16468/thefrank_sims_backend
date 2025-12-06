@@ -26,7 +26,8 @@ export type TUser = {
   stripeAccountId?: string;
   isStripeConnected?: boolean;
   fcm?:string;
-  address?:string;
+  location?:string;
+  recoveryKey?:string;
   isDelete: boolean;
 };
 

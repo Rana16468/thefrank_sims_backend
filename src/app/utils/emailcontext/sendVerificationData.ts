@@ -4,17 +4,24 @@ interface EmailContextType {
 
 const emailContext: EmailContextType = {
   sendVerificationData: (username: string, otp: number, subject: string): string => {
+    // Validate username
     if (!username || typeof username !== 'string') {
       throw new Error('Username must be a non-empty string');
     }
-    if (!otp || typeof otp !== 'number' || otp < 100000 || otp > 999999) {
-      throw new Error('OTP must be a 6-digit number');
+
+    // Validate OTP (allow 4-digit OTP)
+    if (!otp || typeof otp !== 'number' || otp < 1000 || otp > 9999) {
+      throw new Error('OTP must be a 4-digit number');
     }
+
+    // Validate subject
     if (!subject || typeof subject !== 'string') {
       throw new Error('Subject must be a non-empty string');
     }
 
     const currentYear = new Date().getFullYear();
+
+    // Escape username to prevent HTML injection
     const escapedUsername = username.replace(/[<>&"]/g, (match) => {
       const escapeMap: { [key: string]: string } = {
         '<': '&lt;',

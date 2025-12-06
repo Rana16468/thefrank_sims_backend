@@ -61,7 +61,7 @@ const createUserZodSchema = z.object({
 
     isStripeConnected: z.boolean().default(false),
 
-    address: z.string().optional(),
+    location: z.string().optional(),
 
     fcm: z.string().nullable().optional(),
 
