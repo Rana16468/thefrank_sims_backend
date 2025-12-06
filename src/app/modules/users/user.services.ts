@@ -60,6 +60,9 @@ const createUserIntoDb = async (payload: TUser) => {
       // TODO: generate unique subname if needed
     };
 
+   
+
+
     // Save user
     const newUser = new users(newUserData);
     const result = await newUser.save();
@@ -490,6 +493,185 @@ const googleAuthIntoDb = async (payload: TUser) => {
     );
   }
 };
+
+
+const resendVerificationOtpIntoDb = async (email: string) => {
+  try {
+    // ✅ 1. Check if the user exists and is not yet verified
+    const user = await users.findOne(
+      {
+        email,
+        status: USER_ACCESSIBILITY.isProgress,
+      },
+      { _id: 1, isVerify: 1 }
+    );
+
+    if (!user) {
+      throw new AppError(
+        httpStatus.NOT_FOUND,
+        "This user does not exist in our database."
+      );
+    }
+
+  
+
+    if (user.isVerify) {
+      return {
+        status:false,
+        message:"This user is already verified."
+      }
+    }
+
+
+    const otp = await generateUniqueOTP();
+
+    // ✅ 3. Update verification code
+    const updatedUser = await users.findByIdAndUpdate(
+      user._id,
+      { verificationCode: otp },
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      throw new AppError(
+        httpStatus.INTERNAL_SERVER_ERROR,
+        "Failed to update verification code."
+      );
+    }
+          await sendEmail(
+        email,
+        emailContext.sendVerificationData(
+          email,
+          otp,
+          'User Verification Email',
+        ),
+        'Verification OTP Code',
+      );
+
+    return { status:true ,message:"successfully send email "};
+  } catch (error: any) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to resend verification OTP.",
+      error
+    );
+  }
+};
+
+
+const getUserGrowthIntoDb = async (query: { year?: string }) => {
+  try {
+    const year = query.year ? parseInt(query.year) : new Date().getFullYear();
+    const previousYear = year - 1;
+
+    // Get current year stats
+    const currentYearStats = await users.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+            $lte: new Date(`${year}-12-31T23:59:59.999Z`),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          month: "$_id.month",
+          count: 1,
+          _id: 0,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          totalCount: { $sum: "$count" },
+          data: { $push: { month: "$month", count: "$count" } },
+        },
+      },
+      {
+        $project: {
+          totalCount: 1,
+          months: {
+            $map: {
+              input: { $range: [1, 13] },
+              as: "m",
+              in: {
+                year: year,
+                month: "$$m",
+                count: {
+                  $let: {
+                    vars: {
+                      matched: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: "$data",
+                              as: "d",
+                              cond: { $eq: ["$$d.month", "$$m"] },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                    },
+                    in: { $ifNull: ["$$matched.count", 0] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    ]);
+
+    // Get previous year total count
+    const previousYearStats = await users.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(`${previousYear}-01-01T00:00:00.000Z`),
+            $lte: new Date(`${previousYear}-12-31T23:59:59.999Z`),
+          },
+        },
+      },
+      {
+        $count: "totalCount",
+      },
+    ]);
+
+    const currentYearTotal = currentYearStats[0]?.totalCount || 0;
+    const previousYearTotal = previousYearStats[0]?.totalCount || 0;
+
+    // Calculate year-over-year growth percentage
+    let yearlyGrowth = 0;
+    if (previousYearTotal > 0) {
+      yearlyGrowth = ((currentYearTotal - previousYearTotal) / previousYearTotal) * 100;
+    } else if (currentYearTotal > 0) {
+      yearlyGrowth = 100; // If no users in previous year but users exist in current year
+    }
+
+    // Extract monthly stats
+    const monthlyStats = currentYearStats[0]?.months || [];
+
+    return {
+      monthlyStats,
+      yearlyGrowth: parseFloat(yearlyGrowth.toFixed(2)),
+      year,
+    };
+  } catch (error: any) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to fetch user creation stats",
+      error
+    );
+  }
+};
  
 
 
@@ -501,6 +683,8 @@ const UserServices = {
   forgotPasswordIntoDb,
   verificationForgotUserIntoDb,
   resetPasswordIntoDb,
-   googleAuthIntoDb
-};
+   googleAuthIntoDb,
+    resendVerificationOtpIntoDb,
+    getUserGrowthIntoDb
+   };
 export default UserServices;

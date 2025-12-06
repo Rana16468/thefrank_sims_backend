@@ -58,6 +58,11 @@ router.post(
   validationRequest(UserValidationSchema.createUserZodSchema),
   UserController.googleAuth
 );
-
+router.get("/resend_verification_otp/:email",UserController.resendVerificationOtp);
+router.get(
+  "/user_graph",
+  auth(USER_ROLE.admin, USER_ROLE.superAdmin),
+ UserController.getUserGrowth,
+);
 const UserRouters = router;
 export default UserRouters;

@@ -86,6 +86,27 @@ const googleAuth: RequestHandler = catchAsync(async (req, res) => {
   });
 });
 
+const resendVerificationOtp:RequestHandler=catchAsync(async(req , res)=>{
+
+     const result=await  UserServices.resendVerificationOtpIntoDb(req.params.email);
+      sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Successfully  Resend Verification OTP",
+      data: result,
+  });
+});
+
+const getUserGrowth:RequestHandler=catchAsync(async(req , res)=>{
+   const result=await UserServices.getUserGrowthIntoDb(req.query);
+         sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Successfully  Find The User Growth",
+      data: result,
+  });
+})
+
 const UserController = {
   createUser,
   userVarification,
@@ -94,6 +115,8 @@ const UserController = {
   verificationForgotUser,
   resetPassword,
   googleAuth,
+   resendVerificationOtp,
+    getUserGrowth
 };
 
 export default UserController;

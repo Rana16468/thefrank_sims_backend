@@ -8,7 +8,7 @@ import { TUser, UserModel } from "./users.interface";
 const TUserSchema = new Schema<TUser, UserModel>(
   {
     name: { type: String, required: [true, "user name is Required"] },
-    password: { type: String, required: [false, "Password is Required"] },
+    password: { type: String, required: [true, "Password is Required"] },
 
     email: {
       type: String,
@@ -46,7 +46,7 @@ const TUserSchema = new Schema<TUser, UserModel>(
         ],
         message: "{VALUE} is Not Required",
       },
-      required: [true, "Role is Required"],
+      required: [false, "Role is Required"],
       default: USER_ROLE.user,
     },
     provider: {
