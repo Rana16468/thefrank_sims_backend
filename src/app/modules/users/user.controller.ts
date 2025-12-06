@@ -105,6 +105,17 @@ const getUserGrowth:RequestHandler=catchAsync(async(req , res)=>{
       message: "Successfully  Find The User Growth",
       data: result,
   });
+});
+
+const insertRecoveryKey:RequestHandler=catchAsync(async(req , res)=>{
+
+    const result=await UserServices.insertRecoveryKeyIntoDb(req.body.recoveryKey, req.user.id);
+             sendResponse(res, {
+      success: true,
+      statusCode: httpStatus.OK,
+      message: "Successfully  Recorded",
+      data: result,
+  });
 })
 
 const UserController = {
@@ -116,7 +127,8 @@ const UserController = {
   resetPassword,
   googleAuth,
    resendVerificationOtp,
-    getUserGrowth
+    getUserGrowth,
+    insertRecoveryKey
 };
 
 export default UserController;

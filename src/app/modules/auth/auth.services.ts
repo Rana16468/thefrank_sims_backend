@@ -174,7 +174,7 @@ const myprofileIntoDb = async (id: string) => {
   try {
     return await users
       .findById(id)
-      .select("name email phoneNumber dateOfBirth photo country");
+      .select("name email location photo ");
   } catch (error: any) {
     throw new AppError(
       httpStatus.SERVICE_UNAVAILABLE,
@@ -195,39 +195,26 @@ const changeMyProfileIntoDb = async (
 ): Promise<ProfileUpdateResponse> => {
   try {
     const file = req.file;
-    const { name, address, phoneNumber, dateOfBirth, country } = req.body as {
+    const { name, location} = req.body as {
       name?: string;
-      address?: string;
-      phoneNumber?: string;
-      dateOfBirth?: string;
-      country?: string;
+      location?: string;
+      
     };
 
     const updateData: {
       name?: string;
       photo?: string;
-      address?: string;
-      phoneNumber?: string;
-      dateOfBirth?: string;
-      country?: string;
+      location?: string;
+    
     } = {};
 
     if (name) {
       updateData.name = name;
     }
-    if (address) {
-      updateData.address = address;
+    if (location) {
+      updateData.location = location;
     }
-    if (phoneNumber) {
-      updateData.phoneNumber = phoneNumber;
-    }
-    if (dateOfBirth) {
-      updateData.dateOfBirth = dateOfBirth;
-    }
-    if (country) {
-      updateData.country = country;
-    }
-
+    
     if (file) {
       updateData.photo = file?.path?.replace(/\\/g, "/");
     }
@@ -277,7 +264,7 @@ const findByAllUsersAdminIntoDb = async (query: Record<string, unknown>) => {
       users
         .find({ isVerify: true, isDelete: false })
         .select(
-          "name email phoneNumber dateOfBirth photo country createdAt status",
+          "name email phoneNumber location photo recoveryKey  createdAt status",
         ),
       query,
     )

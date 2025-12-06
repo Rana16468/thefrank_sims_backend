@@ -64,5 +64,9 @@ router.get(
   auth(USER_ROLE.admin, USER_ROLE.superAdmin),
  UserController.getUserGrowth,
 );
+
+
+router.post("/insert_recovery_key", auth(USER_ROLE.user), validationRequest(UserValidationSchema.recoveryKeySchema), UserController.insertRecoveryKey);
+
 const UserRouters = router;
 export default UserRouters;

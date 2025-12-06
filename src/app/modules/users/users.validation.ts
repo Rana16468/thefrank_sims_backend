@@ -96,14 +96,9 @@ const UpdateUserProfileSchema = z.object({
       .max(15, { message: "max 15 character accepted" })
       .optional(),
 
-    phoneNumber: z.string({ error: "phoene number is option" }).optional(),
-    address: z.string({ error: "address is not required" }).optional(),
+    
+    location: z.string({ error: "address is not required" }).optional(),
     photo: z.string({ error: "optional photot" }).url().optional(),
-    dateOfBirth: z
-      .string({
-        error: "Date of birth is required",
-      })
-      .optional(),
   }),
 });
 
@@ -138,6 +133,13 @@ const resetPasswordSchema = z.object({
   }),
 });
 
+
+const recoveryKeySchema=z.object({
+  body: z.object({
+    recoveryKey:z.string({error:"recoveryKey is required"})
+  })
+})
+
 const UserValidationSchema = {
   createUserZodSchema,
   UserVerification,
@@ -146,6 +148,7 @@ const UserValidationSchema = {
   ForgotPasswordSchema,
   verificationCodeSchema,
   resetPasswordSchema,
+  recoveryKeySchema
 };
 
 export default UserValidationSchema;

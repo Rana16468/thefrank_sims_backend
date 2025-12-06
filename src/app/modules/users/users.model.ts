@@ -93,6 +93,7 @@ const TUserSchema = new Schema<TUser, UserModel>(
     recoveryKey:{
       type:String, 
       required:[false ,'recoveryKey is required'],
+      default:null
 
     },
     isDelete: {

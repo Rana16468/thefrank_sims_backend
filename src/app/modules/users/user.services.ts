@@ -672,6 +672,49 @@ const getUserGrowthIntoDb = async (query: { year?: string }) => {
     );
   }
 };
+
+const insertRecoveryKeyIntoDb = async (recoveryKey: string, userId: string) => {
+  try {
+    if (!recoveryKey || !userId) {
+      throw new AppError(httpStatus.BAD_REQUEST, 'Recovery key and user ID are required');
+    }
+
+    // Check if recovery key already exists for any user
+    const keyExists = await users.exists({ recoveryKey, isDelete: false });
+    if (keyExists) {
+      return {
+        status: false,
+        message: "Recovery key already exists"
+      };
+    }
+
+    // Update the user's recovery key
+    const updatedUser = await users.findByIdAndUpdate(
+      userId,
+      { $set: { recoveryKey } },
+      { new: true } // return the updated document
+    );
+
+    if (!updatedUser) {
+      throw new AppError(
+        httpStatus.NOT_EXTENDED,
+        'Failed to insert recovery key: user not found'
+      );
+    }
+
+    return {
+      status: true,
+      message: "Recovery key successfully recorded"
+    };
+  } catch (error: any) {
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      "Failed to insert recovery key into database",
+      error
+    );
+  }
+};
+
  
 
 
@@ -685,6 +728,7 @@ const UserServices = {
   resetPasswordIntoDb,
    googleAuthIntoDb,
     resendVerificationOtpIntoDb,
-    getUserGrowthIntoDb
+    getUserGrowthIntoDb,
+    insertRecoveryKeyIntoDb
    };
 export default UserServices;
