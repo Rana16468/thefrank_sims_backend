@@ -11,8 +11,8 @@ import sendResponse from "../../utils/sendResponse";
 const loginUser: RequestHandler = catchAsync(async (req, res) => {
   const result = await AuthServices.loginUserIntoDb(req.body);
 
-  const { refreshToken, accessToken } = result;
-  res.cookie("refreshToken", refreshToken, {
+
+  res.cookie("refreshToken",  result.refreshToken, {
     secure: config.NODE_ENV === "production",
     httpOnly: true,
   });
@@ -20,9 +20,7 @@ const loginUser: RequestHandler = catchAsync(async (req, res) => {
     success: true,
     statusCode: httpStatus.OK,
     message: "Successfully Login",
-    data: {
-      accessToken,
-    },
+    data: result
   });
 });
 
@@ -106,6 +104,22 @@ const getUserGrowth: RequestHandler = catchAsync(async (req, res) => {
 });
 
 
+const recoveryKey:RequestHandler=catchAsync(async(req , res)=>{
+
+   const result=await AuthServices.recoveryKeyIntoDb(req.body);
+    sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Successfully Complete Your Recovery",
+    data: result,
+  });
+})
+
+
+
+
+
+
 
 const AuthController = {
   loginUser,
@@ -115,7 +129,8 @@ const AuthController = {
   findByAllUsersAdmin,
   deleteAccount,
    isBlockAccount,
-   getUserGrowth
+   getUserGrowth,
+    recoveryKey
 
 };
 

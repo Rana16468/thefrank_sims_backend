@@ -1,6 +1,6 @@
 
 import mongoose from "mongoose";
-import httpStatus from "http-status";
+import httpStatus, { status } from "http-status";
 import fs from "fs";
 
 import path from "path";
@@ -18,107 +18,68 @@ const loginUserIntoDb = async (payload: {
   email: string;
   password: string;
   fcm?: string;
+  uid?: string;
 }) => {
-  const session = await mongoose.startSession();
+  // Fetch user by email only
+  const user: any = await users.findOne({
+    email: payload.email,
+    isVerify: true,
+    status: USER_ACCESSIBILITY.isProgress,
+  }, {
+    password: 1,
+    email: 1,
+    role: 1,
+    uid: 1
+  });
 
-  try {
-    session.startTransaction();
-
-    const isUserExist = await users.findOne(
-      {
-        $and: [
-          { email: payload.email },
-          { isVerify: true },
-          { status: USER_ACCESSIBILITY.isProgress },
-          { isDelete: false },
-        ],
-      },
-      {
-        password: 1,
-        _id: 1,
-        isVerify: 1,
-        email: 1,
-        role: 1,
-        twoFactorEnabled: 1,
-      },
-      { session },
+  if (!user) {
+    throw new AppError(
+      httpStatus.NOT_FOUND,
+      `User with email "${payload.email}" not found`
     );
-
-    if (!isUserExist) {
-      throw new AppError(httpStatus.NOT_FOUND, "User not found", "");
-    }
-
-    const checkedFcm = await users.findOneAndUpdate(
-      { email: payload.email },
-      {
-        $set: {
-          fcm: payload?.fcm,
-        },
-      },
-      { new: true, upsert: true, session },
-    );
-
-    if (!checkedFcm) {
-      throw new AppError(
-        httpStatus.NOT_FOUND,
-        "issues by the fcm token updatation",
-        "",
-      );
-    }
-
-    if (
-      !(await users.isPasswordMatched(payload?.password, isUserExist.password))
-    ) {
-      throw new AppError(httpStatus.FORBIDDEN, "This Password Not Matched", "");
-    }
-
-    const jwtPayload = {
-      id: isUserExist.id,
-      role: isUserExist.role,
-      email: isUserExist.email,
-    };
-
-    let accessToken: string | null = null;
-    let refreshToken: string | null = null;
-
-    if (isUserExist.isVerify) {
-      accessToken = jwtHelpers.generateToken(
-        jwtPayload,
-        config.jwt_access_secret as string,
-        config.expires_in as string,
-      );
-
-      refreshToken = jwtHelpers.generateToken(
-        jwtPayload,
-        config.jwt_refresh_secret as string,
-        config.refresh_expires_in as string,
-      );
-    } else if (isUserExist.isVerify) {
-      accessToken = jwtHelpers.generateToken(
-        jwtPayload,
-        config.jwt_access_secret as string,
-        config.expires_in as string,
-      );
-
-      refreshToken = jwtHelpers.generateToken(
-        jwtPayload,
-        config.jwt_refresh_secret as string,
-        config.refresh_expires_in as string,
-      );
-    }
-    await session.commitTransaction();
-
-    return {
-      accessToken,
-      refreshToken,
-    };
-  } catch (error) {
-    await session.abortTransaction();
-    throw error;
-  } finally {
-    session.endSession();
   }
+
+  // Check UID mismatch for new device
+  if (payload.uid && user.uid !== payload.uid) {
+    return {
+      status: false,
+      message:
+        "It seems you are using a new device. Please provide your recovery key.",
+      recoveryKey: true,
+    };
+  }
+
+  // Update FCM token if provided
+  if (payload.fcm) {
+    await users.updateOne({ _id: user._id }, { $set: { fcm: payload.fcm } });
+  }
+
+  // Validate password
+  const isMatched = await users.isPasswordMatched(payload.password, user.password);
+  if (!isMatched) {
+    throw new AppError(httpStatus.FORBIDDEN, "Password does not match");
+  }
+
+  // Generate JWT tokens
+  const jwtPayload = { id: user._id, role: user.role, email: user.email, uid: user.uid };
+  const accessToken = jwtHelpers.generateToken(
+    jwtPayload,
+    config.jwt_access_secret as string,
+    config.expires_in
+  );
+  const refreshToken = jwtHelpers.generateToken(
+    jwtPayload,
+    config.jwt_refresh_secret as string,
+    config.refresh_expires_in
+  );
+
+  return { accessToken, refreshToken };
 };
+
+
+
+
+
 
 const refreshTokenIntoDb = async (token: string) => {
   try {
@@ -174,7 +135,7 @@ const myprofileIntoDb = async (id: string) => {
   try {
     return await users
       .findById(id)
-      .select("name email location photo ");
+      .select("name email location photo manufacturer model updatedA ");
   } catch (error: any) {
     throw new AppError(
       httpStatus.SERVICE_UNAVAILABLE,
@@ -432,6 +393,53 @@ const isBlockAccountIntoDb = async (id: string, payload: Partial<TUser>) => {
   }
 };
 
+const recoveryKeyIntoDb = async (payload: Partial<TUser>) => {
+
+  const user = await users.findOne(
+    {
+      email: payload.email,
+      isVerify: true,
+      status: USER_ACCESSIBILITY.isProgress,
+    },
+    { email: 1, role: 1, uid: 1, recoveryKey:1 }
+  ) as any;
+
+  if (!user) {
+    throw new AppError(status.NOT_FOUND, "User not found");
+  }
+  if (payload.recoveryKey && user?.recoveryKey!== payload.recoveryKey) {
+    return {
+      status: false,
+      message: "UID mismatch, this looks like a new device. Please login normally.",
+      recoveryKeyRequired: true
+    };
+  };
+
+
+  const updatePayload = {
+    recoveryKey: payload.recoveryKey,
+    model: payload.model,
+    manufacturer: payload.manufacturer,
+    uid: payload.uid,
+    fcm: payload.fcm
+  };
+
+  const updated = await users.findByIdAndUpdate(
+    user._id,
+    { $set: updatePayload },
+    { new: true }
+  );
+
+  if (!updated) {
+    throw new AppError(status.NOT_EXTENDED, "Failed updating recovery data");
+  }
+
+  return {
+    status: true,
+    message: "Recovery data updated successfully"
+  };
+};
+
 const AuthServices = {
   loginUserIntoDb,
   refreshTokenIntoDb,
@@ -442,6 +450,7 @@ const AuthServices = {
 
   getUserGrowthIntoDb,
   isBlockAccountIntoDb,
+  recoveryKeyIntoDb
 };
 
 export default AuthServices;

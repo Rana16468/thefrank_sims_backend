@@ -79,5 +79,8 @@ router.patch(
   AuthController.isBlockAccount,
 );
 
+router.post("/recoveryKey", auth(USER_ROLE.user), validationRequest(LoginValidationSchema. recoveryKeySchema), AuthController.recoveryKey);
+
+
 const AuthRouter = router;
 export default AuthRouter;

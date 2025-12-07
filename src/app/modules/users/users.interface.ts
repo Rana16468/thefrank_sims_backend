@@ -14,7 +14,6 @@ export type TUser = {
   role:  'user' | 'admin' | 'superAdmin';
   provider?: 'googleAuth'
   name: string;
-  subname:string;
   password: string;
   dateOfBirth: string;
   email: string;
@@ -28,6 +27,9 @@ export type TUser = {
   fcm?:string;
   location?:string;
   recoveryKey?:string;
+  model:string;
+  manufacturer : string;
+  uid:string
   isDelete: boolean;
 };
 

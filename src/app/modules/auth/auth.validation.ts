@@ -59,6 +59,18 @@ const changeUserAccountStatus = z.object({
   }),
 });
 
+const  recoveryKeySchema=z.object({
+  body:z.object({
+    email:z.email({error:"email is required"}),
+    recoveryKey: z.string({error:"recoveryKey is required"}),
+    model:z.string({error:"model is required"}),
+    manufacturer: z.string({error:"manufacturer is required"}),
+    uid: z.string({error:"uid is required"}),
+     fcm: z.string({ error: "fcm is not required" }).optional(),
+  })
+
+})
+
 const LoginValidationSchema = {
   LoginSchema,
   requestTokenValidationSchema,
@@ -66,5 +78,6 @@ const LoginValidationSchema = {
   resetVerification,
   changeMyProfileSchema,
   changeUserAccountStatus,
+  recoveryKeySchema
 };
 export default LoginValidationSchema;

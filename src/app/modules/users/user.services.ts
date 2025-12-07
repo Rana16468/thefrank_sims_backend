@@ -451,7 +451,7 @@ const googleAuthIntoDb = async (payload: TUser) => {
     if (!user) {
      
       payload.isVerify = true;
-      payload.subname = `${payload.name.toLowerCase().replace(/\s+/g, "_")}_${Math.floor(1000 + Math.random() * 9000)}`;
+      
       
       const newUser = new users(payload);
       user = await newUser.save();
@@ -714,6 +714,8 @@ const insertRecoveryKeyIntoDb = async (recoveryKey: string, userId: string) => {
     );
   }
 };
+
+
 
  
 

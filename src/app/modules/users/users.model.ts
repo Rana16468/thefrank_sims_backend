@@ -96,6 +96,23 @@ const TUserSchema = new Schema<TUser, UserModel>(
       default:null
 
     },
+    model:{
+      type:String,
+      index:true,
+      required:[false , 'model is required']
+
+    },
+        manufacturer:{
+      type:String,
+      index:true,
+      required:[false , 'manufacturer is required']
+
+    },
+    uid:{
+ type:String,
+      index:true,
+      required:[false , 'uuid is required']
+    },
     isDelete: {
       type: Boolean,
       required: [true, "isDeleted is Required"],

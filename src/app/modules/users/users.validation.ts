@@ -64,7 +64,9 @@ const createUserZodSchema = z.object({
     location: z.string().optional(),
 
     fcm: z.string().nullable().optional(),
-
+    model: z.string({error:"model is required"}).optional(),
+    manufacturer: z.string({error:"manufacturer is required"}).optional(),
+    uid:z.string({error:"uuid is optional"}).optional(),
     isDelete: z.boolean().default(false),
   }),
 });
