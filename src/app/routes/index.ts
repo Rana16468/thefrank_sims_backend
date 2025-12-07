@@ -3,6 +3,7 @@ import { TestRoutes } from "../modules/testModule/test.route";
 import UserRouters from "../modules/users/users.route";
 import AuthRouter from "../modules/auth/auth.route";
 import SettingsRoutes from "../modules/settings/settings.routres";
+import SubscriptionRoute from "../modules/subscription/subscription.route";
 
 const router = express.Router();
 
@@ -22,6 +23,10 @@ const moduleRoutes = [
   {
     path:"/setting",
     route:SettingsRoutes
+  },
+  {
+    path:"/subscription",
+    route: SubscriptionRoute
   }
 ];
 
