@@ -4,6 +4,7 @@ import UserRouters from "../modules/users/users.route";
 import AuthRouter from "../modules/auth/auth.route";
 import SettingsRoutes from "../modules/settings/settings.routres";
 import SubscriptionRoute from "../modules/subscription/subscription.route";
+import CurrentSubscriptionRoute from "../modules/current_subscription/current_subscription.route";
 
 const router = express.Router();
 
@@ -27,6 +28,10 @@ const moduleRoutes = [
   {
     path:"/subscription",
     route: SubscriptionRoute
+  },
+  {
+    path:"/current_subscription",
+    route: CurrentSubscriptionRoute
   }
 ];
 
