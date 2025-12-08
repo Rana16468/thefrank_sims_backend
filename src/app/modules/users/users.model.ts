@@ -113,11 +113,18 @@ const TUserSchema = new Schema<TUser, UserModel>(
       index:true,
       required:[false , 'uuid is required']
     },
+    online:{
+
+      type:Boolean,
+      require:false,
+      default :true
+    },
     isDelete: {
       type: Boolean,
       required: [true, "isDeleted is Required"],
       default: false,
     },
+
   },
   {
     timestamps: true,

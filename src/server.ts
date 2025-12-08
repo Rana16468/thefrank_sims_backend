@@ -4,6 +4,7 @@ import app from "./app";
 import config from "./app/config";
 import AppError from "./app/errors/AppError";
 import httpStatus from "http-status";
+import { connectSocket } from "./socket/socketConnection";
 
 let server: Server;
 
@@ -49,6 +50,9 @@ async function main() {
     server = app.listen(config.port, () => {
       console.log(`🚀 Server running on http://${config.host}:${config.port}`);
     });
+    // Initialize Socket only once
+    connectSocket(server);
+
 
   } catch (error: any) {
     throw new AppError(

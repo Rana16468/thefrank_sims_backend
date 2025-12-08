@@ -5,6 +5,8 @@ import AuthRouter from "../modules/auth/auth.route";
 import SettingsRoutes from "../modules/settings/settings.routres";
 import SubscriptionRoute from "../modules/subscription/subscription.route";
 import CurrentSubscriptionRoute from "../modules/current_subscription/current_subscription.route";
+import { conversationRoutes } from "../modules/conversation/conversation.route";
+import messageRoutes from "../modules/message/message.routes";
 
 const router = express.Router();
 
@@ -32,6 +34,14 @@ const moduleRoutes = [
   {
     path:"/current_subscription",
     route: CurrentSubscriptionRoute
+  },
+  {
+    path:"/conversation",
+    route: conversationRoutes
+  },
+  {
+    path:"/message",
+    route: messageRoutes
   }
 ];
 

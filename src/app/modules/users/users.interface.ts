@@ -29,7 +29,8 @@ export type TUser = {
   recoveryKey?:string;
   model:string;
   manufacturer : string;
-  uid:string
+  uid:string;
+   online:Boolean;
   isDelete: boolean;
 };
 
