@@ -22,7 +22,6 @@ router.patch(
   validationRequest(UserValidationSchema.UserVerification),
   UserController.userVarification
 );
-
 router.patch(
   "/change_password",
   auth(
@@ -67,6 +66,8 @@ router.get(
 
 
 router.post("/insert_recovery_key", auth(USER_ROLE.user), validationRequest(UserValidationSchema.recoveryKeySchema), UserController.insertRecoveryKey);
+//  router.post("/generatekeys_e2e", UserController.generatekeysE2E);
+
 
 const UserRouters = router;
 export default UserRouters;

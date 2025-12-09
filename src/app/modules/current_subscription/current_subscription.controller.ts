@@ -29,10 +29,8 @@ const findByMyActiveCurrentSubscription:RequestHandler=catchAsync(async(req , re
          statusCode: status.CREATED,
          message: "Successfully Find By Current Supscription",
          data: result,
-       });
-
-     
-})
+       });  
+});
 
 
 const currentSubscriptionController={

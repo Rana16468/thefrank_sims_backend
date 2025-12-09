@@ -110,13 +110,25 @@ const getUserGrowth:RequestHandler=catchAsync(async(req , res)=>{
 const insertRecoveryKey:RequestHandler=catchAsync(async(req , res)=>{
 
     const result=await UserServices.insertRecoveryKeyIntoDb(req.body.recoveryKey, req.user.id);
-             sendResponse(res, {
+       sendResponse(res, {
       success: true,
       statusCode: httpStatus.OK,
       message: "Successfully  Recorded",
       data: result,
   });
-})
+});
+
+// const generatekeysE2E:RequestHandler=catchAsync(async(req , res)=>{
+
+//      const result=await UserServices.generatekeysE2EIntoDb();
+//             sendResponse(res, {
+//       success: true,
+//       statusCode: httpStatus.OK,
+//       message: "Successfully Generate Private and Publice Key",
+//       data: result,
+//   })
+
+// })
 
 const UserController = {
   createUser,
@@ -129,6 +141,7 @@ const UserController = {
    resendVerificationOtp,
     getUserGrowth,
     insertRecoveryKey
+    
 };
 
 export default UserController;

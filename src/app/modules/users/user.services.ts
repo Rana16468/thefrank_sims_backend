@@ -12,6 +12,7 @@ import config from '../../config';
 import { TUser } from './users.interface';
 import users from './users.model';
 import emailContext from '../../utils/emailcontext/sendVerificationData';
+import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
 
 const generateUniqueOTP = async (): Promise<number> => {
   const MAX_ATTEMPTS = 10;
@@ -57,12 +58,11 @@ const createUserIntoDb = async (payload: TUser) => {
       ...payload,
       email,
       verificationCode: otp,
+      ...cryptoUtils.generateKeyPair()
       // TODO: generate unique subname if needed
     };
 
-   
-
-
+  
     // Save user
     const newUser = new users(newUserData);
     const result = await newUser.save();
@@ -715,6 +715,11 @@ const insertRecoveryKeyIntoDb = async (recoveryKey: string, userId: string) => {
   }
 };
 
+// const generatekeysE2EIntoDb=async()=>{
+
+//      return cryptoUtils.generateKeyPair();
+// }
+
 
 
 const UserServices = {
@@ -727,6 +732,7 @@ const UserServices = {
    googleAuthIntoDb,
     resendVerificationOtpIntoDb,
     getUserGrowthIntoDb,
-    insertRecoveryKeyIntoDb
+    insertRecoveryKeyIntoDb,
+    
    };
 export default UserServices;

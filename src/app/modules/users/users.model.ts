@@ -114,10 +114,17 @@ const TUserSchema = new Schema<TUser, UserModel>(
       required:[false , 'uuid is required']
     },
     online:{
-
       type:Boolean,
       require:false,
       default :true
+    },
+    publicKey:{
+      type: String,
+      required: [true ,'publicKey  is required'] ,
+    },
+    privateKey:{
+      type: String,
+      required: [true ,'privateKey  is required'] ,
     },
     isDelete: {
       type: Boolean,

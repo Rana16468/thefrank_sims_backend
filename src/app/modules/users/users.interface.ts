@@ -31,6 +31,8 @@ export type TUser = {
   manufacturer : string;
   uid:string;
    online:Boolean;
+   publicKey: String;
+   privateKey:String;
   isDelete: boolean;
 };
 
