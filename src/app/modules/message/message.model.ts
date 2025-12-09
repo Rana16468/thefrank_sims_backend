@@ -32,6 +32,20 @@ const messageSchema = new Schema<IMessage>(
       required: true,
       ref: 'conversations',
     },
+    iv:{
+      type: String,
+      required:[true ,'iv is required']
+    },
+    tag: {
+      type: String,
+      required:[true ,'tag is required']
+    },
+    ephemPublicKey:{
+      type: String,
+      required:[true , 'ephemPublicKey is required']
+    }
+
+
   },
   {
     timestamps: true,

@@ -30,8 +30,8 @@ const connectSocket = (server: HTTPServer) => {
     const currentUser = await users.findByIdAndUpdate(
       userId,
       { online: true, updatedAt: new Date() },
-      { new: true, select: '_id' }
-    );
+      { new: true, select: '_id publicKey' }
+    ) as any;
 
     if (!currentUser) {
       socket.emit('error', 'User not found');
@@ -53,7 +53,7 @@ const connectSocket = (server: HTTPServer) => {
       socket.join(String(conv._id))
     );
 
-    handleChatEvents(io, socket, currentUserId);
+    handleChatEvents(io, socket, currentUserId, currentUser.publicKey);
 
     console.log('User connected and rooms joined:', currentUserId);
 

@@ -17,7 +17,7 @@ const cryptoUtils = {
   },
 
   deriveSymmetricKey(sharedSecret: Buffer):any {
-    const salt = Buffer.alloc(0); // must not be null
+    const salt = Buffer.alloc(0); 
     return crypto.hkdfSync("sha256", sharedSecret, salt, Buffer.from("msg"), 32);
   },
 

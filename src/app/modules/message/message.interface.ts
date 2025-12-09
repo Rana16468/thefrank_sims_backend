@@ -5,6 +5,10 @@ export interface IMessage {
   imageUrl: string[];
   audioUrl: string;
   seen: boolean;
+  ciphertext: string,
+    iv: string,
+    tag: string,
+    ephemPublicKey: string,
   msgByUserId: Types.ObjectId;
   conversationId: Types.ObjectId;
 }

@@ -14,6 +14,7 @@ const handleChatEvents = async (
   io: IOServer,
   socket: Socket,
   currentUserId: string,
+  publicKey:string
 ): Promise<void> => {
   // join conversation
 
@@ -72,8 +73,11 @@ const handleChatEvents = async (
   // handleSendMessage(io, socket, currentUserId, data)
  // group chat 
   socket.on('send-message', (data) =>handleSendMessage(io, socket, currentUserId, data));
+
+
+
 // single chat 
-    socket.on('single-chat-send-message', (data)=>handleSingleSendMessage(io, socket, currentUserId, data))
+    socket.on('single-chat-send-message', (data)=>handleSingleSendMessage(io, socket, currentUserId, data, publicKey ))
 };
 
 export default handleChatEvents;

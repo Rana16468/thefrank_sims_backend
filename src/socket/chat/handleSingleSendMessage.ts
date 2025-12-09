@@ -4,23 +4,32 @@ import messages from "../../app/modules/message/message.model";
 import users from "../../app/modules/users/users.model";
 import conversations from "../../app/modules/conversation/conversation.model";
 import { CHAT_TYPE } from "../../app/modules/conversation/conversation.constant";
+import crypto  from 'crypto';
+import cryptoUtils from "../../app/utils/cryptoUtils/cryptoUtils";
 
 
 export const handleSingleSendMessage = async (
   io: Server,
   socket: Socket,
   currentUserId: string,
-  data: any
+  data: any,
+  publicKey:string,
 ) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
     // 1️⃣ Validate receiver
+
+
+     console.log("...........................................")
+    console.log({currentUserId, publicKey, data})
+     console.log("...........................................")
+
     if (!data?.receiverId) {
       throw new Error("Receiver ID is required");
     }
-
+   
    
 
     const receiver = await users.findById(data.receiverId).session(session);
@@ -52,16 +61,29 @@ export const handleSingleSendMessage = async (
     }
 
     // 3️⃣ Create message
-    const newMessage = await messages.create(
-      [
-        {
-          text: data.text,
-          msgByUserId: currentUserId,
-          conversationId: conversation._id,
-        },
-      ],
-      { session }
-    );
+    const recipientPub = Buffer.from(publicKey, "base64");
+    const ephem = crypto.createECDH("prime256v1");
+      ephem.generateKeys();
+      const sharedSecret = ephem.computeSecret(recipientPub);
+    
+      const encrypted = cryptoUtils.encryptMessage(sharedSecret, data.text);
+     
+      
+
+  const newMessage = await messages.create(
+  [
+    {
+      text: encrypted.ciphertext, 
+      iv: encrypted.iv,
+      tag: encrypted.tag,
+      ephemPublicKey: ephem.getPublicKey().toString("base64"),
+      msgByUserId: currentUserId,
+      conversationId: conversation._id,
+    },
+  ],
+  { session }
+);
+
     const savedMessage = newMessage[0];
 
     // 4️⃣ Update conversation's last message
