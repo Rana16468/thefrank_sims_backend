@@ -59,7 +59,6 @@ const handleChatEvents = async (
   // handleMessagePage(socket,currentUserId, data);
 
   socket.on('message-page', (data) => handleMessagePage(socket,currentUserId, data));
-
   socket.on('typing', ({ conversationId, userId }) => {
     socket.to(conversationId).emit('user-typing', { conversationId, userId });
   });

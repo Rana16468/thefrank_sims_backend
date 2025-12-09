@@ -3,6 +3,8 @@ import AppError from "../../errors/AppError";
 import { TCurrentSubscription } from "./current_subscription.interface";
 import { subscriptionStatus } from "./current_subscription.constant";
 import currentsubscriptions from "./current_subscription.model";
+import QueryBuilder from "../../builder/QueryBuilder";
+import mongoose from "mongoose";
 
 const recorded_subscription_IntoDb = async (
   payload: TCurrentSubscription,
@@ -71,7 +73,109 @@ const recorded_subscription_IntoDb = async (
 };
 
 
+const findByMyActiveCurrentSubscriptionIntoDb = async (
+  userId: string
+) => {
+  try {
+    let userIdMatch: any;
 
-const currentSubscriptionServices={ recorded_subscription_IntoDb }
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      userIdMatch = new mongoose.Types.ObjectId(userId);
+    } else {
+      userIdMatch = userId;
+    }
+
+    const agg = await currentsubscriptions.aggregate([
+      {
+        $match: {
+          userId: userIdMatch,
+          isActive: true,
+          isDelete: false
+        }
+      },
+      {
+        $facet: {
+          paid: [
+            { $match: { typesubscription: "paid" } },
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 }
+          ],
+          free: [
+            { $match: { typesubscription: "free" } },
+            { $sort: { createdAt: -1 } }
+          ]
+        }
+      },
+      {
+        $project: {
+          result: {
+            $cond: [
+              { $gt: [{ $size: "$paid" }, 0] },
+              "$paid",
+              "$free"
+            ]
+          }
+        }
+      },
+      { $unwind: { path: "$result", preserveNullAndEmptyArrays: true } },
+      { $replaceRoot: { newRoot: "$result" } },
+
+      {
+        $lookup: {
+          from: "subscriptions",         
+          localField: "subscriptionId",  
+          foreignField: "_id",           
+          as: "subscriptionDetails"
+        }
+      },
+
+      // flatten
+      {
+        $unwind: {
+          path: "$subscriptionDetails",
+          preserveNullAndEmptyArrays: true
+        }
+      },
+
+   {
+  $project: {
+    _id: 1,
+    isActive: 1,
+    typesubscription: 1,
+    subscriptionId: 1,
+    subscriptionPriceId: 1,
+
+    subscriptionPrice: {
+      $arrayElemAt: [
+        {
+          $filter: {
+            input: "$subscriptionDetails.subscriptionPrice",
+            as: "p",
+            cond: { $eq: ["$$p._id", "$subscriptionPriceId"] }
+          }
+        },
+        0
+      ]
+    }
+  }
+}
+
+    ]);
+
+    return agg;
+
+  } catch (error: any) {
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      "find By All User Admin IntoDb server unavailable",
+      error
+    );
+  }
+};
+
+
+
+
+const currentSubscriptionServices={ recorded_subscription_IntoDb, findByMyActiveCurrentSubscriptionIntoDb }
 
 export default currentSubscriptionServices;

@@ -83,5 +83,5 @@ function shutdownServer(exitCode: number) {
 // Start server
 // ==============================
 main().then(() => {
-  console.log("--- Omerabashar Server is running ---");
+  console.log("--- thefrank sims Server is running ---");
 });
