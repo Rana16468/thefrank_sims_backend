@@ -12,6 +12,8 @@ import messages from './message.model';
 import QueryBuilder from '../../builder/QueryBuilder';
 import { CHAT_TYPE } from '../conversation/conversation.constant';
 import users from '../users/users.model';
+import crypto from 'crypto';
+import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
 
 
 
@@ -313,38 +315,85 @@ const deleteMessageById_IntoDb = async (messageId: string) => {
 };
 
 
-const findBySpecificConversationInDb=async(conversationId:string,query: Record<string, unknown>,)=>{
-  
-  try{
-    const baseQuery = messages
-          .find({conversationId  }).populate([
-        {
-          path: "msgByUserId",
-          select: "name photo", 
-        }])
-        
-        const messagerQuery = new QueryBuilder(baseQuery, query)
-          .search(["participants.name"])
-          .filter()
-          .sort()
-          .paginate()
-          .fields();
-    
-        const allmessage = await messagerQuery.modelQuery;
-        const meta = await messagerQuery.countTotal();
-    
-        return { meta, allmessage };
+const findBySpecificConversationInDb = async (
+  conversationId: string,
+  query: Record<string, unknown>,
+  userId: string
+) => {
+  try {
+    // STEP 1: get conversation participants
+    const conversation = await conversations
+      .findById(conversationId)
+      .select("participants")
+      .lean();
 
-  }
-  catch(error:any)
-  {
+    if (!conversation) {
+      throw new Error("Conversation not found");
+    }
+
+    // STEP 2: fetch messages + populate sender info in one query
+    const baseQuery = messages
+      .find({ conversationId })
+      .populate({
+        path: "msgByUserId",
+        select: "name photo privateKey", // include privateKey for decryption
+      });
+
+    // Apply QueryBuilder
+    const messagerQuery = new QueryBuilder(baseQuery, query)
+      .search(["msgByUserId.name"])
+      .filter()
+      .sort()
+      .paginate()
+      .fields();
+
+    const allmessage = await messagerQuery.modelQuery.lean();
+    const meta = await messagerQuery.countTotal();
+
+    // STEP 3: decrypt messages and remove encryption fields
+    const decrypted = allmessage.map((msg: any) => {
+      try {
+        const senderPrivateKey = msg.msgByUserId?.privateKey;
+
+        if (!senderPrivateKey) return { ...msg, text: "[Key missing]" };
+
+        const ecdh = crypto.createECDH("prime256v1");
+        ecdh.setPrivateKey(Buffer.from(senderPrivateKey, "base64"));
+
+        const sharedSecret = ecdh.computeSecret(
+          Buffer.from(msg.ephemPublicKey, "base64")
+        );
+
+        const text = cryptoUtils.decryptMessage(sharedSecret, {
+          ciphertext: msg.text,
+          iv: msg.iv,
+          tag: msg.tag,
+        });
+
+        // Return only the fields we want
+        const { iv, tag, ephemPublicKey, ...rest } = msg;
+        return { ...rest, text };
+      } catch (err) {
+        const { iv, tag, ephemPublicKey, ...rest } = msg;
+        return { ...rest, text: "[Unable to decrypt message]" };
+      }
+    });
+
+    return { meta, allmessage: decrypted };
+  } catch (error: any) {
     throw new AppError(
       httpStatus.INTERNAL_SERVER_ERROR,
       "Error find By Specific Conversation InDb",
-      error,
+      error
     );
   }
 };
+
+
+
+
+
+
 
 const single_new_message_IntoDb = async (
   user: JwtPayload,

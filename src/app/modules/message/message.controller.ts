@@ -48,7 +48,7 @@ const deleteMessageById: RequestHandler = catchAsync(async (req, res) => {
 
 const findBySpecificConversation:RequestHandler=catchAsync(async(req , res)=>{
 
-     const result=await MessageService.findBySpecificConversationInDb(req.params.conversationId, req.query);
+     const result=await MessageService.findBySpecificConversationInDb(req.params.conversationId, req.query, req.user.id);
        sendResponse(res, {
     statusCode: httpStatus.OK,
     success: true,
