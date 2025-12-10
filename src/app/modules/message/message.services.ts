@@ -317,11 +317,16 @@ const deleteMessageById_IntoDb = async (messageId: string) => {
 
 const findBySpecificConversationInDb = async (
   conversationId: string,
-  query: Record<string, unknown>,
-  userId: string
+  query: Record<string, unknown>
+
+
+
+ 
 ) => {
   try {
-    // STEP 1: get conversation participants
+
+
+    console.log(query)
     const conversation = await conversations
       .findById(conversationId)
       .select("participants")
@@ -331,12 +336,11 @@ const findBySpecificConversationInDb = async (
       throw new Error("Conversation not found");
     }
 
-    // STEP 2: fetch messages + populate sender info in one query
     const baseQuery = messages
       .find({ conversationId })
       .populate({
         path: "msgByUserId",
-        select: "name photo privateKey", // include privateKey for decryption
+        select: "name photo privateKey", 
       });
 
     // Apply QueryBuilder
@@ -349,11 +353,9 @@ const findBySpecificConversationInDb = async (
 
     const allmessage = await messagerQuery.modelQuery.lean();
     const meta = await messagerQuery.countTotal();
-
-    // STEP 3: decrypt messages and remove encryption fields
-    const decrypted = allmessage.map((msg: any) => {
+    const decrypted = allmessage?.map((msg: any) => {
       try {
-        const senderPrivateKey = msg.msgByUserId?.privateKey;
+        const senderPrivateKey = msg?.msgByUserId?.privateKey;
 
         if (!senderPrivateKey) return { ...msg, text: "[Key missing]" };
 
@@ -369,9 +371,12 @@ const findBySpecificConversationInDb = async (
           iv: msg.iv,
           tag: msg.tag,
         });
+        
 
         // Return only the fields we want
         const { iv, tag, ephemPublicKey, ...rest } = msg;
+
+
         return { ...rest, text };
       } catch (err) {
         const { iv, tag, ephemPublicKey, ...rest } = msg;
