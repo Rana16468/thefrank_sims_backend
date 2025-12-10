@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CHAT_TYPE } from '../conversation/conversation.constant';
 
 
 const messageSchema = z.object({
@@ -8,6 +9,8 @@ const messageSchema = z.object({
     currentSubId: z.string().optional(),
     audioUrl: z.string().optional(),
     receiverId: z.string({ error: "receiverId is required" }),
+    chat: z.enum([CHAT_TYPE.singlechat, CHAT_TYPE.groupchat])
+    
     
   })
   .superRefine((data, ctx) => {

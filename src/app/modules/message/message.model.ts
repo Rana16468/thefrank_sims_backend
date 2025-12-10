@@ -1,56 +1,53 @@
 import mongoose, { model, Schema } from 'mongoose';
-import { IMessage } from './message.interface';
+import { IMessage, IEncryptedField } from './message.interface';
 
-
+// 🔒 Sub-schema for encrypted fields
+const EncryptedFieldSchema = new Schema<IEncryptedField>(
+  {
+    ciphertext: { type: String, required: true },
+    iv: { type: String, required: true },
+    tag: { type: String, required: true },
+  },
+  { _id: false } // prevent Mongoose from creating _id for each encrypted object
+);
 
 const messageSchema = new Schema<IMessage>(
   {
     text: {
-      type: String,
-      default: '',
+      type: EncryptedFieldSchema,
+      required: true,
     },
     imageUrl: {
-      type: [String],
+      type: [EncryptedFieldSchema],
       default: [],
     },
     audioUrl: {
-     type: String,
-     required: false,
-     default: "",
+      type: EncryptedFieldSchema,
+      default: null,
     },
     seen: {
       type: Boolean,
       default: false,
     },
+    ephemPublicKey: {
+      type: String,
+      required: [true, 'ephemPublicKey is required'],
+    },
     msgByUserId: {
-      type: mongoose.Schema.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       ref: 'users',
     },
     conversationId: {
-      type: mongoose.Schema.ObjectId,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       ref: 'conversations',
     },
-    iv:{
-      type: String,
-      required:[true ,'iv is required']
-    },
-    tag: {
-      type: String,
-      required:[true ,'tag is required']
-    },
-    ephemPublicKey:{
-      type: String,
-      required:[true , 'ephemPublicKey is required']
-    }
-
-
   },
   {
     timestamps: true,
-    versionKey:false
-  },
+    versionKey: false,
+  }
 );
 
 const messages = model<IMessage>('messages', messageSchema);

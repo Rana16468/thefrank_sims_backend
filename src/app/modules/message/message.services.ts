@@ -16,7 +16,6 @@ import crypto from 'crypto';
 import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
 
 
-
 interface JwtPayloads {
   id: string;
 }
@@ -27,179 +26,196 @@ interface NewMessagePayload {
   text: string;
   imageUrl?: string[];
   audioUrl?: string;
+  chat?: "singlechat" | "groupchat"
 }
 
 export const new_message_IntoDb = async (
   user: JwtPayloads,
   data: NewMessagePayload
 ) => {
- 
-  if (!user?.id) {
-    throw new AppError(httpStatus.UNAUTHORIZED, "User ID not found in token", "");
-  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  // ✅ 2. Check if receiver exists
-  const isReceiverExist = await users.findById(data.receiverId).select("_id");
-  if (!isReceiverExist) {
-    throw new AppError(httpStatus.NOT_FOUND, "Receiver ID not found", "");
-  }
+  try {
+    // -----------------------
+    // 1) Basic validations
+    // -----------------------
+    if (!user?.id) throw new AppError(httpStatus.UNAUTHORIZED, 'User ID missing', '');
+    if (!data?.receiverId) throw new AppError(httpStatus.BAD_REQUEST, 'Receiver ID required', '');
 
-  // if (user.id === data.receiverId) {
-  //   throw new AppError(
-  //     httpStatus.BAD_REQUEST,
-  //     "SenderId and ReceiverId cannot be the same",
-  //     ""
-  //   );
-  // }
+    // -----------------------
+    // 2) Get receiver (must have publicKey)
+    // -----------------------
+    const receiver = await users
+      .findById(data.receiverId)
+      .select('publicKey')
+      .session(session);
 
-  const io = getSocketIO();
-  let isNewConversation = false;
+    if (!receiver) throw new AppError(httpStatus.NOT_FOUND, 'Receiver not found', '');
+    if (!receiver.publicKey) throw new AppError(httpStatus.BAD_REQUEST, 'Receiver public key missing', '');
 
-  // ✅ 3. Find or create conversation
-  let conversation = await conversations.findOne({
-    eventId: data.currentSubId,
-    participants: { $all: [user.id, data.receiverId] },
-  });
+    // -----------------------
+    // 3) Find or create conversation
+    // -----------------------
+    let conversation = await conversations
+      .findOne({
+        eventId: data.currentSubId,
+        participants: { $all: [user.id, data.receiverId], $size: 2 },
+      })
+      .session(session);
 
-  if (!conversation) {
-    conversation = await conversations.create({
-      eventId: data.currentSubId,
-      participants: [user.id, data.receiverId],
-    });
-    isNewConversation = true;
-  } else {
-    // verify conversation validity
-    if (!conversation._id) {
-      throw new AppError(
-        httpStatus.INTERNAL_SERVER_ERROR,
-        "Invalid conversation object",
-        ""
+    let isNewConversation = false;
+
+    if (!conversation) {
+      const created = await conversations.create(
+        [
+          {
+            currentSubId: data.currentSubId,
+            participants: [user.id, data.receiverId],
+            chat: data.chat
+          },
+        ],
+        { session }
       );
+      conversation = created[0];
+      isNewConversation = true;
     }
 
-    const isExistConversation = await conversations.exists({
-      _id: conversation._id,
-      participants: user.id,
-    });
-
-    if (!isExistConversation) {
-      throw new AppError(httpStatus.NOT_FOUND, "Conversation not found", "");
+    if (!conversation || !conversation._id) {
+      throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, 'Conversation creation failed', '');
     }
 
-    const updatedConversation = await conversations.findByIdAndUpdate(
-      conversation._id,
-      { $addToSet: { participants: user.id } },
-      { new: true }
-    );
+    // -----------------------
+    // 4) Encryption using receiver's publicKey (ECDH)
+    // -----------------------
+    const recipientPub = Buffer.from(receiver.publicKey, 'base64');
+    const ephem = crypto.createECDH('prime256v1');
+    ephem.generateKeys();
+    const sharedSecret = ephem.computeSecret(recipientPub);
 
-    if (!updatedConversation) {
-      throw new AppError(
-        httpStatus.NOT_EXTENDED,
-        "Failed to add participant",
-        ""
-      );
+    // Encrypt text
+    const encryptedText = cryptoUtils.encryptMessage(sharedSecret, data.text);
+
+    // Encrypt images
+    let imageUrlEncrypted: { ciphertext: string; iv: string; tag: string }[] = [];
+    if (Array.isArray(data.imageUrl) && data.imageUrl.length > 0) {
+      imageUrlEncrypted = data.imageUrl.map((img) => cryptoUtils.encryptMessage(sharedSecret, img));
     }
 
-    conversation = updatedConversation;
-  }
-
-  // ✅ 4. Safety check
-  if (!conversation || !conversation._id) {
-    throw new AppError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      "Conversation missing _id",
-      ""
-    );
-  }
-
-  // ✅ 5. Join both users to the room if online
-  const participants = [user.id, data.receiverId].filter(Boolean);
-  for (const participantId of participants) {
-    const socketId = onlineUsers.get(participantId.toString());
-    if (socketId) {
-      const participantSocket = io.sockets.sockets.get(socketId);
-      if (participantSocket) {
-        const roomId = conversation._id.toString();
-        participantSocket.join(roomId);
-        participantSocket.data.currentConversationId = roomId;
-      }
+    // Encrypt audio
+    let audioEncrypted: { ciphertext: string; iv: string; tag: string } | undefined;
+    if (data.audioUrl) {
+      audioEncrypted = cryptoUtils.encryptMessage(sharedSecret, data.audioUrl);
     }
-  }
 
-  // ✅ 6. Save message (FIXED HERE)
-  const messageData = {
-    text: data.text,
-    imageUrl: data.imageUrl || [],
-    audioUrl: data.audioUrl || "",
-    msgByUserId: new mongoose.Types.ObjectId(user.id), // 🔥 FIXED
-    conversationId: conversation._id,
-  };
-
-  const saveMessage = await messages.create(messageData);
-
-  // ✅ 7. Update conversation last message
-  await conversations.updateOne(
-    { _id: conversation._id },
-    { lastMessage: saveMessage._id }
-  );
-
-  // ✅ 8. Auto-seen logic
-  const roomId = conversation._id?.toString() ?? "";
-  if (!roomId) {
-    throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, "Missing room ID", "");
-  }
-
-  const room = io.sockets.adapter.rooms.get(roomId);
-  if (room && room.size > 1) {
-    for (const socketId of room) {
-      const s = io.sockets.sockets.get(socketId);
-      if (
-        s &&
-        s.data?.currentConversationId === roomId &&
-        s.id !== onlineUsers.get(user.id.toString())
-      ) {
-        await messages.updateOne(
-          { _id: saveMessage._id },
-          { $set: { seen: true } }
-        );
-
-        io.to(roomId).emit("messages-seen", {
+    // -----------------------
+    // 5) Persist message inside transaction
+    // -----------------------
+    const newMessage = await messages.create(
+      [
+        {
+          text: encryptedText,
+          imageUrl: imageUrlEncrypted,
+          audioUrl: audioEncrypted || null,
+          seen: false,
+          ephemPublicKey: ephem.getPublicKey().toString('base64'),
+          msgByUserId: new mongoose.Types.ObjectId(user.id),
           conversationId: conversation._id,
-          seenBy: user.id,
-          messageIds: [saveMessage._id],
-        });
-        break;
-      }
-    }
-  }
+        },
+      ],
+      { session }
+    );
 
-  // ✅ 9. Emit message event
-  const updatedMsg = await messages
-    .findById(saveMessage._id)
-    .populate("msgByUserId", "name photo email");
+    const savedMessage = newMessage[0];
 
-  io.to(roomId).emit("new-message", updatedMsg);
+    // -----------------------
+    // 6) Update conversation.lastMessage
+    // -----------------------
+    await conversations.updateOne(
+      { _id: conversation._id },
+      { lastMessage: savedMessage._id },
+      { session }
+    );
 
-  // ✅ 10. Notify receiver & sender if new conversation
-  if (isNewConversation) {
-    io.to(data.receiverId.toString()).emit("conversation-created", {
-      conversationId: conversation._id,
-      lastMessage: updatedMsg,
-    });
-    io.to(data.receiverId.toString()).emit("new-message", updatedMsg);
+    // -----------------------
+    // 7) Commit transaction
+    // -----------------------
+    await session.commitTransaction();
+    session.endSession();
+
+    // -----------------------
+    // 8) Socket handling + emits
+    // -----------------------
+    const io = getSocketIO();
+    const roomId = conversation._id.toString();
 
     const senderSocketId = onlineUsers.get(user.id.toString());
     if (senderSocketId) {
       const senderSocket = io.sockets.sockets.get(senderSocketId);
-      senderSocket?.emit("conversation-created", {
-        conversationId: conversation._id,
-        lastMessage: updatedMsg,
-      });
+      if (senderSocket) {
+        senderSocket.join(roomId);
+        senderSocket.data.currentConversationId = roomId;
+      }
     }
-  }
 
-  return updatedMsg;
+    const populatedMsg = await messages
+      .findById(savedMessage._id)
+      .populate('msgByUserId', 'name photo email');
+
+    io.to(roomId).emit('new-message', populatedMsg);
+
+    // -----------------------
+    // 9) Auto-seen logic
+    // -----------------------
+    const room = io.sockets.adapter.rooms.get(roomId);
+    if (room) {
+      for (const socketId of room) {
+        const s = io.sockets.sockets.get(socketId);
+        if (s && s.data?.currentConversationId === roomId && s.id !== senderSocketId) {
+          await messages.updateOne({ _id: savedMessage._id }, { $set: { seen: true } });
+
+          io.to(roomId).emit('messages-seen', {
+            conversationId: conversation._id,
+            seenBy: data.receiverId,
+            messageIds: [savedMessage._id],
+          });
+
+          break;
+        }
+      }
+    }
+
+    // -----------------------
+    // 10) Notify for new conversation
+    // -----------------------
+    if (isNewConversation) {
+      io.to(data.receiverId.toString()).emit('conversation-created', {
+        conversationId: conversation._id,
+        lastMessage: populatedMsg,
+      });
+
+      io.to(data.receiverId.toString()).emit('new-message', populatedMsg);
+
+      if (senderSocketId) {
+        const senderSocket = io.sockets.sockets.get(senderSocketId);
+        senderSocket?.emit('conversation-created', {
+          conversationId: conversation._id,
+          lastMessage: populatedMsg,
+        });
+      }
+    }
+
+    return populatedMsg && {status:true , message:"successfully send message"};
+  } catch (err: any) {
+    try {
+      await session.abortTransaction();
+    } catch {}
+    session.endSession();
+
+    throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, err.message || 'Message sending failed', '');
+  }
 };
+
 //update message
 const updateMessageById_IntoDb = async (
   messageId: string,
@@ -318,15 +334,8 @@ const deleteMessageById_IntoDb = async (messageId: string) => {
 const findBySpecificConversationInDb = async (
   conversationId: string,
   query: Record<string, unknown>
-
-
-
- 
 ) => {
   try {
-
-
-    console.log(query)
     const conversation = await conversations
       .findById(conversationId)
       .select("participants")
@@ -343,7 +352,6 @@ const findBySpecificConversationInDb = async (
         select: "name photo privateKey", 
       });
 
-    // Apply QueryBuilder
     const messagerQuery = new QueryBuilder(baseQuery, query)
       .search(["msgByUserId.name"])
       .filter()
@@ -353,31 +361,38 @@ const findBySpecificConversationInDb = async (
 
     const allmessage = await messagerQuery.modelQuery.lean();
     const meta = await messagerQuery.countTotal();
-    const decrypted = allmessage?.map((msg: any) => {
+
+    const decrypted = allmessage.map((msg: any) => {
       try {
         const senderPrivateKey = msg?.msgByUserId?.privateKey;
-
         if (!senderPrivateKey) return { ...msg, text: "[Key missing]" };
 
         const ecdh = crypto.createECDH("prime256v1");
         ecdh.setPrivateKey(Buffer.from(senderPrivateKey, "base64"));
 
-        const sharedSecret = ecdh.computeSecret(
-          Buffer.from(msg.ephemPublicKey, "base64")
-        );
+       
+        const decryptedText = msg.text
+          ? cryptoUtils.decryptMessage(ecdh.computeSecret(Buffer.from(msg.ephemPublicKey, "base64")), msg.text)
+          : "";
 
-        const text = cryptoUtils.decryptMessage(sharedSecret, {
-          ciphertext: msg.text,
-          iv: msg.iv,
-          tag: msg.tag,
-        });
+        const decryptedImages = Array.isArray(msg.imageUrl)
+          ? msg.imageUrl.map((img: any) => cryptoUtils.decryptMessage(ecdh.computeSecret(Buffer.from(msg.ephemPublicKey, "base64")), img))
+          : [];
+
+       
+        const decryptedAudio = msg.audioUrl
+          ? cryptoUtils.decryptMessage(ecdh.computeSecret(Buffer.from(msg.ephemPublicKey, "base64")), msg.audioUrl)
+          : null;
+
         
-
-        // Return only the fields we want
         const { iv, tag, ephemPublicKey, ...rest } = msg;
 
-
-        return { ...rest, text };
+        return {
+          ...rest,
+          text: decryptedText,
+          imageUrl: decryptedImages,
+          audioUrl: decryptedAudio,
+        };
       } catch (err) {
         const { iv, tag, ephemPublicKey, ...rest } = msg;
         return { ...rest, text: "[Unable to decrypt message]" };
