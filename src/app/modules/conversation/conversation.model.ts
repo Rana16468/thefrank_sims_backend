@@ -13,9 +13,15 @@ const conversationSchema = new Schema<IConversation>(
       ref:"currentsubscriptions",
       index:true
     },
+   
     participants: {
       type: [Schema.Types.ObjectId],
       ref: 'users',
+    },
+     groupname:{
+      type: String,
+      required:[false,'groupname is not required']
+
     },
     lastMessage: {
       type: Schema.Types.ObjectId,
@@ -46,6 +52,8 @@ const conversationSchema = new Schema<IConversation>(
     timestamps: true,
   },
 );
+
+
 
 
 

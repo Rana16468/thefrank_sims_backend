@@ -11,7 +11,6 @@ import users from '../users/users.model';
 
 
 
-
 const getConversation = async (
   profileId: string,
   query: Record<string, unknown>,
@@ -105,7 +104,15 @@ const allConversationIntoDb=async(currentSubId:string)=>{
 
 const getSingleConversationListIntoDb = async (currentUserId: string, query:  Record<string, unknown>) => {
   try {
-    const baseQuery = conversations
+    
+        
+   
+
+
+
+      
+
+    const conversationQuery = new QueryBuilder(conversations
       .find({
         chat: CHAT_TYPE.singlechat,
         participants: currentUserId,
@@ -113,19 +120,15 @@ const getSingleConversationListIntoDb = async (currentUserId: string, query:  Re
           {
              path: "participants",
         match: { _id: { $ne: currentUserId } }, 
-        select: "name photo email",
+        select: "name photo",
           },
-         {
-          path: "lastMessage",
-          select: "text  createdAt",
+        //  {
+        //   path: "lastMessage",
+        //   select: "text  createdAt",
          
-        },
+        // },
         ]) 
-   
-      .sort({ updatedAt: -1 })
-      
-
-    const conversationQuery = new QueryBuilder(baseQuery, query)
+, query)
       .filter()
       .sort()
       .paginate()
@@ -133,8 +136,10 @@ const getSingleConversationListIntoDb = async (currentUserId: string, query:  Re
 
     const allConversations = await conversationQuery.modelQuery;
     const meta = await conversationQuery.countTotal();
+  
 
-    return { meta, allConversations };
+
+    return { meta, allConversations};
   } catch (error: any) {
     
     throw new AppError(

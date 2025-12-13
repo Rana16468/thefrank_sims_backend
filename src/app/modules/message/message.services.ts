@@ -338,19 +338,24 @@ const findBySpecificConversationInDb = async (
   try {
     const conversation = await conversations
       .findById(conversationId)
-      .select("participants")
+      .select("participants -_id")
       .lean();
 
     if (!conversation) {
       throw new Error("Conversation not found");
     }
+const userPrivateKeyList = await users.find(
+  { _id: { $in: conversation.participants } },
+  {  privateKey: 1 }
+).lean();
 
+ 
     const baseQuery = messages
       .find({ conversationId })
       .populate({
         path: "msgByUserId",
-        select: "name photo privateKey", 
-      });
+        select: "name photo ", 
+      }).select("-conversationId");
 
     const messagerQuery = new QueryBuilder(baseQuery, query)
       .search(["msgByUserId.name"])
@@ -362,42 +367,64 @@ const findBySpecificConversationInDb = async (
     const allmessage = await messagerQuery.modelQuery.lean();
     const meta = await messagerQuery.countTotal();
 
-    const decrypted = allmessage.map((msg: any) => {
-      try {
-        const senderPrivateKey = msg?.msgByUserId?.privateKey;
-        if (!senderPrivateKey) return { ...msg, text: "[Key missing]" };
+ const decrypted = allmessage?.map((msg: any) => {
+  const { iv, tag, ephemPublicKey, ...rest } = msg;
 
-        const ecdh = crypto.createECDH("prime256v1");
-        ecdh.setPrivateKey(Buffer.from(senderPrivateKey, "base64"));
+  if (!ephemPublicKey) {
+    return { ...rest, text: "[Missing ephem key]" };
+  }
 
-       
-        const decryptedText = msg.text
-          ? cryptoUtils.decryptMessage(ecdh.computeSecret(Buffer.from(msg.ephemPublicKey, "base64")), msg.text)
-          : "";
+  const ephemKeyBuffer = Buffer.from(ephemPublicKey, "base64");
 
-        const decryptedImages = Array.isArray(msg.imageUrl)
-          ? msg.imageUrl.map((img: any) => cryptoUtils.decryptMessage(ecdh.computeSecret(Buffer.from(msg.ephemPublicKey, "base64")), img))
-          : [];
+  // all possible private keys (sender + receiver)
+  const possiblePrivateKeys = userPrivateKeyList
+    .map((u: any) => u.privateKey)
+    .filter(Boolean);
 
-       
-        const decryptedAudio = msg.audioUrl
-          ? cryptoUtils.decryptMessage(ecdh.computeSecret(Buffer.from(msg.ephemPublicKey, "base64")), msg.audioUrl)
-          : null;
+  let decryptedText = "[Unable to decrypt]";
+  let decryptedImages: any[] = [];
+  let decryptedAudio: any = null;
 
-        
-        const { iv, tag, ephemPublicKey, ...rest } = msg;
+  for (const privateKey of possiblePrivateKeys) {
+    try {
+      const ecdh = crypto.createECDH("prime256v1");
+      ecdh.setPrivateKey(Buffer.from(privateKey, "base64"));
 
-        return {
-          ...rest,
-          text: decryptedText,
-          imageUrl: decryptedImages,
-          audioUrl: decryptedAudio,
-        };
-      } catch (err) {
-        const { iv, tag, ephemPublicKey, ...rest } = msg;
-        return { ...rest, text: "[Unable to decrypt message]" };
-      }
-    });
+      const sharedSecret = ecdh.computeSecret(ephemKeyBuffer);
+
+      // try decrypting text
+      decryptedText = msg.text
+        ? cryptoUtils.decryptMessage(sharedSecret, msg.text)
+        : "";
+
+      // try decrypting images
+      decryptedImages = Array.isArray(msg.imageUrl)
+        ? msg.imageUrl.map((img: any) =>
+            cryptoUtils.decryptMessage(sharedSecret, img)
+          )
+        : [];
+
+      // try decrypting audio
+      decryptedAudio = msg.audioUrl
+        ? cryptoUtils.decryptMessage(sharedSecret, msg.audioUrl)
+        : null;
+
+      // ✅ success → stop trying other keys
+      break;
+    } catch (err) {
+      // ❌ wrong private key → try next one
+      continue;
+    }
+  }
+
+  return {
+    ...rest,
+    text: decryptedText,
+    imageUrl: decryptedImages,
+    audioUrl: decryptedAudio,
+  };
+});
+
 
     return { meta, allmessage: decrypted };
   } catch (error: any) {
@@ -488,6 +515,8 @@ const single_new_message_IntoDb = async (
     );
   }
 };
+
+
 
 
 const MessageService = {
