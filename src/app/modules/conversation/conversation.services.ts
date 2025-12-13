@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import mongoose from 'mongoose';
+import mongoose, { Types } from 'mongoose';
 import conversations from './conversation.model';
 import QueryBuilder from '../../builder/QueryBuilder';
 import messages from '../message/message.model';
@@ -8,6 +8,8 @@ import AppError from '../../errors/AppError';
 import status from 'http-status';
 import { CHAT_TYPE } from './conversation.constant';
 import users from '../users/users.model';
+import { IConversation } from './conversation.interface';
+import currentsubscriptions from '../current_subscription/current_subscription.model';
 
 
 
@@ -106,15 +108,10 @@ const getSingleConversationListIntoDb = async (currentUserId: string, query:  Re
   try {
     
         
-   
-
-
-
-      
 
     const conversationQuery = new QueryBuilder(conversations
       .find({
-        chat: CHAT_TYPE.singlechat,
+        // chat: CHAT_TYPE.singlechat || CHAT_TYPE.groupchat,
         participants: currentUserId,
       }).populate([
           {
@@ -192,6 +189,78 @@ const getGroupConversationListIntoDb = async (eventId: string, currentUserId:str
 };
 
 
+const createGroupConversationIntoDb = async (
+  payload: Partial<IConversation>,
+  userId: string
+): Promise<{
+  status: true;
+  message: string;
+}> => {
+  try {
+    if (!payload.groupname || !payload.currentSubId) {
+      throw new AppError(
+        status.BAD_REQUEST,
+        "Group name and subscription ID are required"
+      );
+    }
+    const participants = payload.participants ?? [];
+    const uniqueParticipants = Array.from(
+      new Set([...participants, userId])
+    );
+    const participantObjectIds = uniqueParticipants.map(
+      id => new Types.ObjectId(id)
+    );
+
+    const validParticipantsCount = await users.countDocuments({
+      _id: { $in: participantObjectIds },
+      isVerify: true,
+    });
+
+    if (validParticipantsCount !== participantObjectIds.length) {
+      throw new AppError(
+        status.BAD_REQUEST,
+        "One or more participants are invalid or not verified"
+      );
+    }
+
+    const finalPayload = {
+      groupname: payload.groupname,
+      currentSubId: payload.currentSubId,
+      participants: participantObjectIds,
+      chat: payload.chat ?? "groupchat",
+    };
+
+    const isExistSubscription=await currentsubscriptions.exists({_id:payload.currentSubId, isActive:true});
+    if(!isExistSubscription){
+      throw new AppError(status.NOT_EXTENDED, 'issues by the subscription expire ')
+    }
+
+    const result = await conversations.create(finalPayload); 
+
+    if (!result) {
+      throw new AppError(
+        status.INTERNAL_SERVER_ERROR,
+        "Failed to create group conversation"
+      );
+    }
+
+    return {
+      status: true,
+      message: "Successfully created group conversation",
+    };
+  } catch (error: any) {
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      error.message ||
+        "Issue while creating conversation group — server unavailable"
+    );
+  }
+};
+
+
+
+
+
 
 
 
@@ -201,7 +270,8 @@ const ConversationService = {
   getConversation,
   allConversationIntoDb,
    getSingleConversationListIntoDb,
-   getGroupConversationListIntoDb
+   getGroupConversationListIntoDb,
+ createGroupConversationIntoDb
 };
 
 export default ConversationService;

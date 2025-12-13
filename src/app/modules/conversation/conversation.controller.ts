@@ -67,6 +67,19 @@ const getGroupConversationList:RequestHandler=catchAsync(async(req , res)=>{
   }); 
 });
 
+const createGroupConversation:RequestHandler=catchAsync(async(req , res)=>{
+
+    const result=await ConversationService.createGroupConversationIntoDb(req.body, req.user.id);
+      sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'successfully  create Group',
+    data: result,
+  }); 
+
+     
+})
+
 
 
 const ConversationController = {
@@ -74,7 +87,8 @@ const ConversationController = {
    allConversation,
    specificAllGetConversations,
     getSingleConversationList,
-    getGroupConversationList
+    getGroupConversationList,
+    createGroupConversation
 };
 
 export default ConversationController;

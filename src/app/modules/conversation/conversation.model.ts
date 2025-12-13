@@ -16,6 +16,8 @@ const conversationSchema = new Schema<IConversation>(
    
     participants: {
       type: [Schema.Types.ObjectId],
+      required:[true , 'participants is required'],
+      
       ref: 'users',
     },
      groupname:{
