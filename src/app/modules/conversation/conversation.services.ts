@@ -6,7 +6,6 @@ import QueryBuilder from '../../builder/QueryBuilder';
 import messages from '../message/message.model';
 import AppError from '../../errors/AppError';
 import status from 'http-status';
-import { CHAT_TYPE } from './conversation.constant';
 import users from '../users/users.model';
 import { IConversation } from './conversation.interface';
 import currentsubscriptions from '../current_subscription/current_subscription.model';
@@ -117,7 +116,7 @@ const getSingleConversationListIntoDb = async (currentUserId: string, query:  Re
           {
              path: "participants",
         match: { _id: { $ne: currentUserId } }, 
-        select: "name photo",
+        select: "name photo online",
           },
         //  {
         //   path: "lastMessage",

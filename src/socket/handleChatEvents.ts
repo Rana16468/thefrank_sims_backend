@@ -72,7 +72,7 @@ const handleChatEvents = async (
 
   // handleSendMessage(io, socket, currentUserId, data)
  // group chat 
-  socket.on('send-message', (data) =>handleSendMessage(io, socket, currentUserId, data));
+  socket.on('group_send-message', (data) =>handleSendMessage(io, socket, currentUserId, data, publicKey));
 
 
 

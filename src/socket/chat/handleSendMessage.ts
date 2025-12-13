@@ -1,181 +1,232 @@
 import { Server, Socket } from "socket.io";
 import mongoose from "mongoose";
+import crypto from "crypto";
 
 import conversations from "../../app/modules/conversation/conversation.model";
 import messages from "../../app/modules/message/message.model";
-import AppError from "../../app/errors/AppError";
-import status from "http-status";
 import users from "../../app/modules/users/users.model";
 import { USER_ROLE } from "../../app/modules/users/user.constant";
+import cryptoUtils from "../../app/utils/cryptoUtils/cryptoUtils";
 
 
 interface MessagePayload {
-  receiverId?: string; // optional for group chat; may be used to add a participant
+  conversationId:string
+  receiverId?: string;
   currentSubId: string;
   text: string;
+  imageUrl?: string[];
+  audioUrl?: string;
 }
 
 export const handleSendMessage = async (
   io: Server,
   socket: Socket,
   currentUserId: string,
-  data: MessagePayload
+  data: MessagePayload,
+  publicKey: string
 ) => {
   const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
-
-   
-    // console.log({data, currentUserId})
-
+    // -----------------------------------
+    // 1️⃣ Validate payload
+    // -----------------------------------
     if (!data.currentSubId) {
-      socket.emit("socket-error", { event: "new-message", message: "Missing eventId" });
-      return;
+      throw new Error("currentSubId is required");
     }
+
     const rawText = (data.text || "").trim();
     if (!rawText) {
-      socket.emit("socket-error", { event: "new-message", message: "Message text is empty" });
-      return;
+      throw new Error("Message text is empty");
     }
-     
-    // if receiverId not founded
-    if(!data.receiverId){
-      const superAdminId=await users.findOne({role:USER_ROLE.admin}).select("_id").lean();
-       data.receiverId=superAdminId?._id.toString();
-       if(!superAdminId){
-          data.receiverId= "69347be2a8744afe3e2ec8b8"
-       };
-      
-    };
 
-    if (data.receiverId && data.receiverId === currentUserId) {
-      socket.emit("socket-error", { event: "new-message", message: "You can't target yourself" });
-      return;
+    // -----------------------------------
+    // 2️⃣ Resolve receiver (fallback admin)
+    // -----------------------------------
+    if (!data.receiverId) {
+      const admin = await users
+        .findOne({ role: USER_ROLE.admin })
+        .select("_id")
+        .lean();
+
+      data.receiverId = admin?._id.toString() || "69347be2a8744afe3e2ec8b8";
     }
-    
-    if (data?.receiverId) {
-      const receiverExists = await users.exists({ _id: data.receiverId });
-      if (!receiverExists) {
-        socket.emit("socket-error", { event: "new-message", message: "Provided receiverId not found" });
-        return;
-      }
+
+    if (data.receiverId === currentUserId) {
+      throw new Error("You can't send message to yourself");
     }
-    session.startTransaction();
-    const participantsToEnsure: string[] = [currentUserId];
-    if (data.receiverId) participantsToEnsure.push(data.receiverId);
+
+    const receiverExists = await users
+      .exists({ _id: data.receiverId })
+      .session(session);
+
+    if (!receiverExists) {
+      throw new Error("Receiver not found");
+    }
+
+
+
+    // -----------------------------------
+    // 3️⃣ Find or create conversation
+    // -----------------------------------
+    const participants = [currentUserId, data.receiverId];
 
     const conversation = await conversations.findOneAndUpdate(
-      { currentSubId: data.currentSubId },
+      {_id: data?.conversationId, currentSubId: data.currentSubId },
       {
         $setOnInsert: {
           currentSubId: data.currentSubId,
           createdAt: new Date(),
         },
-        $addToSet: { participants: { $each: participantsToEnsure } },
+        $addToSet: { participants: { $each: participants } },
       },
-      { new: true, upsert: true, setDefaultsOnInsert: true, session }
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true,
+        session,
+      }
     ) as any;
 
     if (!conversation) {
-      throw new AppError(status.INTERNAL_SERVER_ERROR, "Failed to create or fetch conversation", "");
+      throw new Error("Failed to create conversation");
     }
 
-    const createdMessages = await messages.create(
+    // -----------------------------------
+    // 4️⃣ Encrypt message (ECDH)
+    // -----------------------------------
+    const recipientPub = Buffer.from(publicKey, "base64");
+    const ephem = crypto.createECDH("prime256v1");
+    ephem.generateKeys();
+
+    const sharedSecret = ephem.computeSecret(recipientPub);
+
+    const encryptedText = cryptoUtils.encryptMessage(sharedSecret, rawText);
+
+    const encryptedImages =
+      Array.isArray(data.imageUrl) && data.imageUrl.length > 0
+        ? data.imageUrl.map(img =>
+            cryptoUtils.encryptMessage(sharedSecret, img)
+          )
+        : [];
+
+    const encryptedAudio = data.audioUrl
+      ? cryptoUtils.encryptMessage(sharedSecret, data.audioUrl)
+      : undefined;
+
+    // -----------------------------------
+    // 5️⃣ Save message
+    // -----------------------------------
+    const created = await messages.create(
       [
         {
-          text: rawText,
-          msgByUserId: currentUserId,
+          text: encryptedText,
+          imageUrl: encryptedImages,
+          audioUrl: encryptedAudio,
+          iv: encryptedText.iv,
+          tag: encryptedText.tag,
+          ephemPublicKey: ephem.getPublicKey().toString("base64"),
+          msgByUserId: new mongoose.Types.ObjectId(currentUserId),
           conversationId: conversation._id,
-          seenBy: [],
+          seen: false,
           createdAt: new Date(),
         },
       ],
       { session }
     );
-    const createdMessage = createdMessages[0];
 
+    const savedMessage = created[0];
+
+    // -----------------------------------
+    // 6️⃣ Update conversation lastMessage
+    // -----------------------------------
     await conversations.updateOne(
       { _id: conversation._id },
-      { $set: { lastMessage: createdMessage._id, updatedAt: new Date() } },
+      { lastMessage: savedMessage._id, updatedAt: new Date() },
       { session }
     );
 
+    // -----------------------------------
+    // 7️⃣ Commit transaction
+    // -----------------------------------
     await session.commitTransaction();
     session.endSession();
 
+    // -----------------------------------
+    // 8️⃣ Socket room join
+    // -----------------------------------
     const roomId = conversation._id.toString();
+
     socket.join(roomId);
     socket.data.currentConversationId = roomId;
 
+    // -----------------------------------
+    // 9️⃣ Populate message
+    // -----------------------------------
+    const populatedMsg = await messages
+      .findById(savedMessage._id)
+      .populate("msgByUserId", "name photo email");
+
+    // -----------------------------------
+    // 🔟 Emit new message
+    // -----------------------------------
+    io.to(roomId).emit("new-message", populatedMsg);
+
+    // -----------------------------------
+    // 1️⃣1️⃣ Auto-seen logic
+    // -----------------------------------
     const room = io.sockets.adapter.rooms.get(roomId);
-    const presentUserIds = new Set<string>();
-    if (room && room.size > 0) {
+    if (room) {
       for (const socketId of room) {
         const s = io.sockets.sockets.get(socketId);
-        if (!s) continue;
-        const uid = (s.data && s.data.userId) || (s.handshake && s.handshake.auth && s.handshake.auth.userId);
-        if (typeof uid === "string" && uid !== currentUserId) {
-          
-          presentUserIds.add(uid);
+        if (
+          s &&
+          s.data?.currentConversationId === roomId &&
+          s.data?.userId !== currentUserId
+        ) {
+          await messages.updateOne(
+            { _id: savedMessage._id },
+            { $set: { seen: true } }
+          );
+
+          io.to(roomId).emit("messages-seen", {
+            conversationId: conversation._id,
+            seenBy: data.receiverId,
+            messageIds: [savedMessage._id],
+          });
+          break;
         }
       }
     }
 
-    // If some participants are present, mark message as seen by them.
-    const presentIdsArray = Array.from(presentUserIds);
-    if (presentIdsArray.length > 0) {
-      // update message document to add seenBy entries
-      await messages.updateOne({ _id: createdMessage._id }, { $addToSet: { seenBy: { $each: presentIdsArray } } });
-      // emit messages-seen to the conversation room (so clients can update read receipts)
-      io.to(roomId).emit("messages-seen", {
-        conversationId: conversation._id,
-        seenBy: presentIdsArray,
-        messageIds: [createdMessage._id],
-      });
-    }
-
-    // Populate message for emit (include author info if your schema supports it)
-    const updatedMsg = await messages.findById(createdMessage._id).populate([
-      { path: "msgByUserId", select: "name photo" },
-    ]);
-
-    // Broadcast the new message once to the conversation room
-    io.to(roomId).emit("new-message", updatedMsg);
-
-    // If conversation was newly created (we can't directly know from findOneAndUpdate if it was inserted),
-    // attempt to detect "new" by checking if conversation.createdAt is very recent (within 5s).
-    // This is heuristic; if your schema stores a 'createdBy' or a 'isNew' flag on insert that's better.
-    const justCreated = (() => {
-      if (!conversation.createdAt) return false;
-      const createdAt = new Date(conversation.createdAt).getTime();
-      return Date.now() - createdAt < 5000; // 5 seconds
-    })();
+    // -----------------------------------
+    // 1️⃣2️⃣ New conversation notify
+    // -----------------------------------
+    const justCreated =
+      Date.now() - new Date(conversation.createdAt).getTime() < 5000;
 
     if (justCreated) {
-      // Notify participants that a conversation was created
-      // We emit to participant user rooms (assuming your server has them join a room named by their userId on connect)
-      const recipients = Array.from(new Set(conversation.participants.map(String)));
-      for (const participantId of recipients) {
-        io.to(participantId as any).emit("conversation-created", {
+      const participantIds = conversation.participants.map(String);
+
+      for (const uid of participantIds) {
+        io.to(uid).emit("conversation-created", {
           conversationId: conversation._id,
-          lastMessage: updatedMsg,
+          lastMessage: populatedMsg,
         });
       }
-
-      // Also emit to sender's socket a local confirmation
-      socket.emit("conversation-created", { conversationId: conversation._id, message: updatedMsg });
     }
 
-  
-  } catch (err: any) {
-    try {
-      await session.abortTransaction();
-    } catch (abortErr) {
-    } finally {
-      session.endSession();
-    }
+    return populatedMsg;
+  } catch (error: any) {
+    console.error("handleSendMessage error:", error);
 
-    console.error("handleSendMessage (group) error:", err);
-    const message = err?.message || "Internal Server Error";
-    socket.emit("socket-error", { event: "new-message", message });
+    await session.abortTransaction();
+    session.endSession();
+
+    socket.emit("socket-error", {
+      event: "new-message",
+      message: error.message || "Failed to send message",
+    });
   }
 };

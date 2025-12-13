@@ -36,6 +36,7 @@ export const handleSingleSendMessage = async (
     // -------------------------------
     let conversation = await conversations
       .findOne({
+        _id: data?.conversationId,
         chat: CHAT_TYPE.singlechat,
         participants: { $all: [currentUserId, data.receiverId], $size: 2 },
       })

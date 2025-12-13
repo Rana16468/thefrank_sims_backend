@@ -22,6 +22,7 @@ interface JwtPayloads {
 
 interface NewMessagePayload {
   receiverId: string;
+  conversationId:string;
   currentSubId: string;
   text: string;
   imageUrl?: string[];
@@ -59,7 +60,8 @@ export const new_message_IntoDb = async (
     // -----------------------
     let conversation = await conversations
       .findOne({
-        eventId: data.currentSubId,
+        _id: data.conversationId,
+        currentSubId: data.currentSubId,
         participants: { $all: [user.id, data.receiverId], $size: 2 },
       })
       .session(session);
@@ -354,8 +356,10 @@ const userPrivateKeyList = await users.find(
       .find({ conversationId })
       .populate({
         path: "msgByUserId",
-        select: "name photo ", 
-      }).select("-conversationId");
+        select: "name photo online ", 
+      });
+
+
 
     const messagerQuery = new QueryBuilder(baseQuery, query)
       .search(["msgByUserId.name"])

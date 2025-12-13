@@ -17,6 +17,8 @@ const auto_detected_subscription_expiry_date = async () => {
       )
       .lean();
 
+
+
     if (expiredSubscriptions.length === 0) {
         console.log( { modifiedCount: 0, message: "No expired subscriptions found" })
       return { modifiedCount: 0, message: "No expired subscriptions found" };
