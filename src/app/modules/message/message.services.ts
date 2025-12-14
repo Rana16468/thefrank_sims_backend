@@ -58,13 +58,16 @@ export const new_message_IntoDb = async (
     // -----------------------
     // 3) Find or create conversation
     // -----------------------
+
     let conversation = await conversations
       .findOne({
         _id: data.conversationId,
         currentSubId: data.currentSubId,
-        participants: { $all: [user.id, data.receiverId], $size: 2 },
+        participants: { $all: [user.id, data.receiverId] },
       })
       .session(session);
+   
+
 
     let isNewConversation = false;
 

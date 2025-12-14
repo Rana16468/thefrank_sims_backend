@@ -4,6 +4,7 @@ import { CHAT_TYPE } from '../conversation/conversation.constant';
 
 const messageSchema = z.object({
   body: z.object({
+    conversationId:z.string({error:"conversationId is required"}),
     text: z.string().trim().optional(),
     imageUrl: z.array(z.string()).optional(),
     currentSubId: z.string().optional(),
