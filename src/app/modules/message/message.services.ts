@@ -312,12 +312,14 @@ const deleteMessageById_IntoDb = async (messageId: string) => {
     session.endSession();
 
     const io = getSocketIO();
-    conversation.participants.forEach((participantId) => {
+    conversation?.participants?.forEach((participantId) => {
       io.to(participantId.toString()).emit("message-deleted", {
         messageId,
         conversationId,
       });
-    });
+    }); 
+
+   
 
     return {
       success: true,
