@@ -1,9 +1,6 @@
 
-import mongoose from "mongoose";
 import httpStatus, { status } from "http-status";
-import fs from "fs";
 
-import path from "path";
 import users from "../users/users.model";
 import { USER_ACCESSIBILITY, USER_ROLE } from "../users/user.constant";
 import AppError from "../../errors/AppError";

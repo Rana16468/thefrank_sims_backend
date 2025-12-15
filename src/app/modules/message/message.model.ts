@@ -15,14 +15,16 @@ const messageSchema = new Schema<IMessage>(
   {
     text: {
       type: EncryptedFieldSchema,
-      required: true,
+      required: false,
     },
     imageUrl: {
       type: [EncryptedFieldSchema],
+      required:false,
       default: [],
     },
     audioUrl: {
       type: EncryptedFieldSchema,
+      required:false,
       default: null,
     },
     seen: {

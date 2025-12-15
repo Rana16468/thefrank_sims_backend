@@ -10,8 +10,6 @@ import sendResponse from "../../utils/sendResponse";
 
 const loginUser: RequestHandler = catchAsync(async (req, res) => {
   const result = await AuthServices.loginUserIntoDb(req.body);
-
-
   res.cookie("refreshToken",  result.refreshToken, {
     secure: config.NODE_ENV === "production",
     httpOnly: true,

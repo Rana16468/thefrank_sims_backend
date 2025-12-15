@@ -7,6 +7,7 @@ import SubscriptionRoute from "../modules/subscription/subscription.route";
 import CurrentSubscriptionRoute from "../modules/current_subscription/current_subscription.route";
 import { conversationRoutes } from "../modules/conversation/conversation.route";
 import messageRoutes from "../modules/message/message.routes";
+import SecureFolderRouter from "../modules/secure_folder/secure_folder.route";
 
 const router = express.Router();
 
@@ -42,6 +43,10 @@ const moduleRoutes = [
   {
     path:"/message",
     route: messageRoutes
+  },
+  {
+    path:"/secure_folder",
+    route: SecureFolderRouter
   }
 ];
 

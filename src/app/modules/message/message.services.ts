@@ -22,12 +22,12 @@ interface JwtPayloads {
 
 interface NewMessagePayload {
   receiverId: string;
-  conversationId:string;
+  conversationId: string;
   currentSubId: string;
-  text: string;
+  text?: string; // optional now
   imageUrl?: string[];
   audioUrl?: string;
-  chat?: "singlechat" | "groupchat"
+  chat?: "singlechat" | "groupchat";
 }
 
 export const new_message_IntoDb = async (
@@ -41,24 +41,23 @@ export const new_message_IntoDb = async (
     // -----------------------
     // 1) Basic validations
     // -----------------------
-    if (!user?.id) throw new AppError(httpStatus.UNAUTHORIZED, 'User ID missing', '');
-    if (!data?.receiverId) throw new AppError(httpStatus.BAD_REQUEST, 'Receiver ID required', '');
+    if (!user?.id) throw new AppError(httpStatus.UNAUTHORIZED, "User ID missing", "");
+    if (!data?.receiverId) throw new AppError(httpStatus.BAD_REQUEST, "Receiver ID required", "");
 
     // -----------------------
     // 2) Get receiver (must have publicKey)
     // -----------------------
     const receiver = await users
       .findById(data.receiverId)
-      .select('publicKey')
+      .select("publicKey")
       .session(session);
 
-    if (!receiver) throw new AppError(httpStatus.NOT_FOUND, 'Receiver not found', '');
-    if (!receiver.publicKey) throw new AppError(httpStatus.BAD_REQUEST, 'Receiver public key missing', '');
+    if (!receiver) throw new AppError(httpStatus.NOT_FOUND, "Receiver not found", "");
+    if (!receiver.publicKey) throw new AppError(httpStatus.BAD_REQUEST, "Receiver public key missing", "");
 
     // -----------------------
     // 3) Find or create conversation
     // -----------------------
-
     let conversation = await conversations
       .findOne({
         _id: data.conversationId,
@@ -66,8 +65,6 @@ export const new_message_IntoDb = async (
         participants: { $all: [user.id, data.receiverId] },
       })
       .session(session);
-   
-
 
     let isNewConversation = false;
 
@@ -77,7 +74,7 @@ export const new_message_IntoDb = async (
           {
             currentSubId: data.currentSubId,
             participants: [user.id, data.receiverId],
-            chat: data.chat
+            chat: data.chat,
           },
         ],
         { session }
@@ -87,30 +84,44 @@ export const new_message_IntoDb = async (
     }
 
     if (!conversation || !conversation._id) {
-      throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, 'Conversation creation failed', '');
+      throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, "Conversation creation failed", "");
     }
 
     // -----------------------
     // 4) Encryption using receiver's publicKey (ECDH)
     // -----------------------
-    const recipientPub = Buffer.from(receiver.publicKey, 'base64');
-    const ephem = crypto.createECDH('prime256v1');
+    const recipientPub = Buffer.from(receiver.publicKey, "base64");
+    const ephem = crypto.createECDH("prime256v1");
     ephem.generateKeys();
     const sharedSecret = ephem.computeSecret(recipientPub);
 
-    // Encrypt text
-    const encryptedText = cryptoUtils.encryptMessage(sharedSecret, data.text);
-
-    // Encrypt images
-    let imageUrlEncrypted: { ciphertext: string; iv: string; tag: string }[] = [];
-    if (Array.isArray(data.imageUrl) && data.imageUrl.length > 0) {
-      imageUrlEncrypted = data.imageUrl.map((img) => cryptoUtils.encryptMessage(sharedSecret, img));
+    // Encrypt text (if exists)
+    let encryptedText
+    if (data.text) {
+      encryptedText = cryptoUtils.encryptMessage(sharedSecret, data.text);
     }
 
-    // Encrypt audio
+    // Encrypt images (if exists)
+    let imageUrlEncrypted: { ciphertext: string; iv: string; tag: string }[] = [];
+    if (Array.isArray(data.imageUrl) && data.imageUrl.length > 0) {
+      imageUrlEncrypted = data.imageUrl.map((img) =>
+        cryptoUtils.encryptMessage(sharedSecret, img)
+      );
+    }
+
+    // Encrypt audio (if exists)
     let audioEncrypted: { ciphertext: string; iv: string; tag: string } | undefined;
     if (data.audioUrl) {
       audioEncrypted = cryptoUtils.encryptMessage(sharedSecret, data.audioUrl);
+    }
+
+    // Ensure at least one content exists
+    if (!encryptedText && imageUrlEncrypted.length === 0 && !audioEncrypted) {
+      throw new AppError(
+        httpStatus.BAD_REQUEST,
+        "Message must contain text, images, or audio",
+        ""
+      );
     }
 
     // -----------------------
@@ -119,11 +130,11 @@ export const new_message_IntoDb = async (
     const newMessage = await messages.create(
       [
         {
-          text: encryptedText,
+          text: encryptedText || null,
           imageUrl: imageUrlEncrypted,
           audioUrl: audioEncrypted || null,
           seen: false,
-          ephemPublicKey: ephem.getPublicKey().toString('base64'),
+          ephemPublicKey: ephem.getPublicKey().toString("base64"),
           msgByUserId: new mongoose.Types.ObjectId(user.id),
           conversationId: conversation._id,
         },
@@ -165,9 +176,9 @@ export const new_message_IntoDb = async (
 
     const populatedMsg = await messages
       .findById(savedMessage._id)
-      .populate('msgByUserId', 'name photo email');
+      .populate("msgByUserId", "name photo email");
 
-    io.to(roomId).emit('new-message', populatedMsg);
+    io.to(roomId).emit("new-message", populatedMsg);
 
     // -----------------------
     // 9) Auto-seen logic
@@ -179,7 +190,7 @@ export const new_message_IntoDb = async (
         if (s && s.data?.currentConversationId === roomId && s.id !== senderSocketId) {
           await messages.updateOne({ _id: savedMessage._id }, { $set: { seen: true } });
 
-          io.to(roomId).emit('messages-seen', {
+          io.to(roomId).emit("messages-seen", {
             conversationId: conversation._id,
             seenBy: data.receiverId,
             messageIds: [savedMessage._id],
@@ -194,30 +205,34 @@ export const new_message_IntoDb = async (
     // 10) Notify for new conversation
     // -----------------------
     if (isNewConversation) {
-      io.to(data.receiverId.toString()).emit('conversation-created', {
+      io.to(data.receiverId.toString()).emit("conversation-created", {
         conversationId: conversation._id,
         lastMessage: populatedMsg,
       });
 
-      io.to(data.receiverId.toString()).emit('new-message', populatedMsg);
+      io.to(data.receiverId.toString()).emit("new-message", populatedMsg);
 
       if (senderSocketId) {
         const senderSocket = io.sockets.sockets.get(senderSocketId);
-        senderSocket?.emit('conversation-created', {
+        senderSocket?.emit("conversation-created", {
           conversationId: conversation._id,
           lastMessage: populatedMsg,
         });
       }
     }
 
-    return populatedMsg && {status:true , message:"successfully send message"};
+    return { status: true, message: "Successfully sent message", data: populatedMsg };
   } catch (err: any) {
     try {
       await session.abortTransaction();
     } catch {}
     session.endSession();
 
-    throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, err.message || 'Message sending failed', '');
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      err.message || "Message sending failed",
+      ""
+    );
   }
 };
 
@@ -356,7 +371,7 @@ const userPrivateKeyList = await users.find(
   {  privateKey: 1 }
 ).lean();
 
- 
+
     const baseQuery = messages
       .find({ conversationId })
       .populate({
