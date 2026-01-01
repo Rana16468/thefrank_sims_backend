@@ -2,7 +2,9 @@ import { z } from "zod";
 import { USER_ACCESSIBILITY, USER_ROLE } from "./user.constant";
 
 // Common password regex (min 6 chars, at least 1 number & 1 letter)
-const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,}$/;
+// const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d@$!%*?&]{6,}$/;
+const passwordRegex = /^(?=.{6,})(?=.*[^a-zA-Z0-9]).*$/;
+
 
 const createUserZodSchema = z.object({
   body: z.object({

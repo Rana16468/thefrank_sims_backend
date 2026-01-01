@@ -19,9 +19,10 @@ const generateUniqueOTP = async (): Promise<number> => {
 
   for (let i = 0; i < MAX_ATTEMPTS; i++) {
     const otp = Math.floor(1000 + Math.random() * 9000); // 4 digit
+    console.log(otp, "otp")
 
     const existingUser = await users.findOne({ verificationCode: otp });
-
+    console.log(existingUser, "existingUser")
     if (!existingUser) {
       return otp;
     }

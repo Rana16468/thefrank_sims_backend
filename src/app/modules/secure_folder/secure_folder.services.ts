@@ -8,6 +8,7 @@ import mongoose from "mongoose";
 import users from "../users/users.model";
 import cryptoUtils from "../../utils/cryptoUtils/cryptoUtils";
 import crypto from 'crypto';
+import conversations from "../conversation/conversation.model";
 
 
 const createSecureFolderIntoDb = async (
@@ -74,28 +75,58 @@ interface PaginationOptions {
   limit?: number;
 }
 
+interface AggregatedMessage {
+  _id: mongoose.Types.ObjectId;
+  text?: string;
+  imageUrl?: string[];
+  audioUrl?: string | null;
+  createdAt: Date;
+  ephemPublicKey?: string;
+  msgByUserId: mongoose.Types.ObjectId;
+  conversationId: mongoose.Types.ObjectId;
+}
+
+interface AggregationResult {
+  data: AggregatedMessage[];
+  totalCount: { count: number }[];
+}
+
+interface ConversationDoc {
+  participants: mongoose.Types.ObjectId[];
+}
+
+interface UserKeyDoc {
+  privateKey?: string;
+}
+
+interface DecryptedMessage {
+  _id: mongoose.Types.ObjectId;
+  text: string;
+  imageUrl: string[];
+  audioUrl: string | null;
+  createdAt: Date;
+  msgByUserId: mongoose.Types.ObjectId;
+  conversationId: mongoose.Types.ObjectId;
+}
+
 const getUserMediaMessagesIntoDb = async (
   userId: string,
   options: PaginationOptions = {}
-) => {
-  const page = Math.max(1, options.page || 1);
-  const limit = Math.max(1, options.limit || 20);
+): Promise<{
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+  data: DecryptedMessage[];
+}> => {
+  const page = Math.max(1, options.page ?? 1);
+  const limit = Math.max(1, options.limit ?? 20);
   const skip = (page - 1) * limit;
 
-  // 🔐 Fetch user's private key
-  const userKey = await users
-    .findOne({ _id: userId })
-    .select("privateKey")
-    .lean();
-
-    // console.log({userId, userKey})
-
-  if (!userKey?.privateKey) {
-    throw new Error("User private key not found");
-  }
-
-  // 🔎 Fetch messages with pagination
-  const [result] = await messages.aggregate([
+  const [result] = await messages.aggregate<AggregationResult>([
     {
       $match: {
         msgByUserId: new mongoose.Types.ObjectId(userId),
@@ -113,12 +144,14 @@ const getUserMediaMessagesIntoDb = async (
           { $limit: limit },
           {
             $project: {
-              _id: 0,
+              _id: 1,
               imageUrl: 1,
               audioUrl: 1,
+              text: 1,
               createdAt: 1,
               ephemPublicKey: 1,
               msgByUserId: 1,
+              conversationId: 1,
             },
           },
         ],
@@ -127,11 +160,87 @@ const getUserMediaMessagesIntoDb = async (
     },
   ]);
 
-  const total = result?.totalCount[0]?.count || 0;
+  const total = result?.totalCount?.[0]?.count ?? 0;
+  const messageData = result?.data ?? [];
 
+  if (!messageData.length) {
+    return {
+      meta: {
+        page,
+        limit,
+        total: 0,
+        totalPages: 0,
+        hasMore: false,
+      },
+      data: [],
+    };
+  }
 
+  const conversationIds = [
+    ...new Set(messageData.map(m => m.conversationId.toString())),
+  ].map(id => new mongoose.Types.ObjectId(id));
 
-  
+  const conversationsData = await conversations
+    .find({ _id: { $in: conversationIds } })
+    .select("participants -_id")
+    .lean<ConversationDoc[]>();
+
+  const participantIds = [
+    ...new Set(conversationsData.flatMap(c => c.participants.map(p => p.toString()))),
+  ].map(id => new mongoose.Types.ObjectId(id));
+
+  const userPrivateKeys = await users
+    .find({ _id: { $in: participantIds } }, { privateKey: 1 })
+    .lean<UserKeyDoc[]>();
+
+  const privateKeyList = userPrivateKeys
+    .map(u => u.privateKey)
+    .filter((k): k is string => Boolean(k));
+
+  const decryptedMessages: DecryptedMessage[] = messageData.map((msg : any) => {
+    if (!msg.ephemPublicKey) {
+      return {
+        ...msg,
+        text: "[Missing ephem key]",
+        imageUrl: [],
+        audioUrl: null,
+      };
+    }
+
+    const ephemKeyBuffer = Buffer.from(msg.ephemPublicKey, "base64");
+
+    for (const privateKey of privateKeyList) {
+      try {
+        const ecdh = crypto.createECDH("prime256v1");
+        ecdh.setPrivateKey(Buffer.from(privateKey, "base64"));
+        const sharedSecret = ecdh.computeSecret(ephemKeyBuffer);
+
+        return {
+          ...msg,
+          text: msg.text
+            ? cryptoUtils.decryptMessage(sharedSecret, msg.text)
+            : "",
+          imageUrl: Array.isArray(msg.imageUrl)
+            ? msg.imageUrl.map((img:any)=>
+                cryptoUtils.decryptMessage(sharedSecret, img)
+              )
+            : [],
+          audioUrl: msg.audioUrl
+            ? cryptoUtils.decryptMessage(sharedSecret, msg.audioUrl)
+            : null,
+        };
+      } catch {
+        continue;
+      }
+    }
+
+    return {
+      ...msg,
+      text: "[Unable to decrypt]",
+      imageUrl: [],
+      audioUrl: null,
+    };
+  });
 
   return {
     meta: {
@@ -141,9 +250,10 @@ const getUserMediaMessagesIntoDb = async (
       totalPages: Math.ceil(total / limit),
       hasMore: page * limit < total,
     },
-    data: result.data || [],
+    data: decryptedMessages,
   };
 };
+
 
 const SecureFolderServices={
      createSecureFolderIntoDb,

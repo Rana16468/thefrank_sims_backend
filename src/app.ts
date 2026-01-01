@@ -8,6 +8,9 @@ import auto_delete_unverifyed_user from "./app/utils/auto_delete_unverifyed_user
 import AppError from "./app/errors/AppError";
 import status from "http-status";
 import auto_detected_subscription_expiry_date from "./app/utils/auto_detected_subscription_expiry_date";
+import config from "./app/config";
+import path from "path";
+
 const app: Application = express();
 
 // parsers
@@ -18,6 +21,11 @@ app.use(
     credentials: true,
   })
 );
+app.use(
+  config.file_path as string,
+  express.static(path.join(__dirname, 'public')),
+);
+
 
 
 // router setup
