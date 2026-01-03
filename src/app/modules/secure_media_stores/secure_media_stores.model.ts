@@ -33,6 +33,7 @@ const secureMediaStoresSchema = new Schema<ISecureMediaStores>(
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
+      index:true,
       ref: 'users',
     }
  

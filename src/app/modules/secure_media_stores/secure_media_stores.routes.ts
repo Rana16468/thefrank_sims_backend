@@ -54,6 +54,8 @@ routes.post(
    SecureMediaStoresController.uploadContentSecureFolder,
 );
 
+routes.get("/find_by_my_secure_data", auth(USER_ROLE.user), SecureMediaStoresController.findByMySecureFolderMedia)
+
 const SecureMediaStoresRoutes=routes;
 
 export default SecureMediaStoresRoutes;

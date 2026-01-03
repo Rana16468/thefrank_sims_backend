@@ -7,6 +7,7 @@ import cryptoUtils from "../../utils/cryptoUtils/cryptoUtils";
 import mongoose from "mongoose";
 import securemediastores from "./secure_media_stores.model";
 import { ISecureMediaStores } from "./secure_media_stores.interface";
+import QueryBuilder from "../../builder/QueryBuilder";
 
 
 const uploadContentSecureFolderIntoDb = async (
@@ -100,8 +101,107 @@ const uploadContentSecureFolderIntoDb = async (
 };
 
 
+const findByMySecureFolderMediaIntoDb = async (
+  userId: string,
+  query: Record<string, unknown>
+) => {
+  try {
+    // 🔐 Fetch user private key
+    const user = await users
+      .findById(userId)
+      .select("privateKey")
+      .lean<{ privateKey: string }>();
+
+    if (!user?.privateKey) {
+      throw new Error("User private key not found");
+    }
+
+    // 🔑 Prepare ECDH once
+    const ecdh = crypto.createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(user.privateKey, "base64"));
+
+    // 📦 Query data (lean for performance)
+    const qb = new QueryBuilder(
+      securemediastores.find({ userId }).lean(),
+      query
+    )
+      .search([])
+      .filter()
+      .sort()
+      .paginate()
+      .fields();
+
+    const messages = await qb.modelQuery;
+    const meta = await qb.countTotal();
+
+    // 🔓 Decrypt helper
+    const decryptPayload = (
+      sharedSecret: Buffer,
+      payload?: { ciphertext: string; iv: string; tag: string }
+    ) => {
+      if (!payload) return null;
+      return cryptoUtils.decryptMessage(sharedSecret, payload);
+    };
+
+    // 🔄 Decrypt messages
+    const decryptedMessages = messages.map((msg: any) => {
+      if (!msg.ephemPublicKey) {
+        return {
+          ...msg,
+          text: "[Missing ephem key]",
+        };
+      }
+
+      try {
+        const sharedSecret = ecdh.computeSecret(
+          Buffer.from(msg.ephemPublicKey, "base64")
+        );
+
+        return {
+          _id: msg._id,
+          userId: msg.userId,
+          createdAt: msg.createdAt,
+          updatedAt: msg.updatedAt,
+
+          text: msg.text
+            ? decryptPayload(sharedSecret, msg.text)
+            : "",
+
+          imageUrl: Array.isArray(msg.imageUrl)
+            ? msg.imageUrl.map((img: any) =>
+                decryptPayload(sharedSecret, img)
+              )
+            : [],
+
+          audioUrl: decryptPayload(sharedSecret, msg.audioUrl),
+        };
+      } catch (err) {
+        console.error("Decryption failed for message:", msg._id, err);
+        return {
+          _id: msg._id,
+          error: "Unable to decrypt",
+        };
+      }
+    });
+
+    return {
+      meta,
+      allmessage: decryptedMessages,
+    };
+  } catch (error: any) {
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      "Find secure folder data unavailable",
+      error
+    );
+  }
+};
+
+
+
 const SecureMediaStoresServices={
-uploadContentSecureFolderIntoDb
+uploadContentSecureFolderIntoDb,
+ findByMySecureFolderMediaIntoDb 
 };
 
 export default SecureMediaStoresServices;
