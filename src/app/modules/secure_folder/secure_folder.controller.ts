@@ -27,11 +27,24 @@ const getUserMediaMessages:RequestHandler=catchAsync(async(req , res)=>{
     message: 'successfully login folder',
     data: result,
   }); 
+});
+
+
+const uploadContentSecureFolder:RequestHandler=catchAsync(async(req , res)=>{
+
+      const  result=await SecureFolderServices.uploadContentSecureFolderIntoDb(req.user.id, req.body);
+       sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'successfully upload',
+    data: result,
+  }); 
 })
 
 const SecureFolderController={
     createSecureFolder,
-    getUserMediaMessages
+    getUserMediaMessages,
+    uploadContentSecureFolder
 };
 
 

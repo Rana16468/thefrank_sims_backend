@@ -1,21 +1,16 @@
-
 import express, { NextFunction, Request, Response } from 'express';
 import auth from '../../middlewares/auth';
-import { USER_ROLE } from '../users/user.constant';
-import validationRequest from '../../middlewares/validationRequest';
-import SecureFolderValidation from './secure_folder.validation';
-import SecureFolderController from './secure_folder.controller';
 import upload from '../../utils/uploadFile';
+import { USER_ROLE } from '../users/user.constant';
 import AppError from '../../errors/AppError';
 import status from 'http-status';
-import MessageValidationSchema from '../message/message.validations';
+import validationRequest from '../../middlewares/validationRequest';
+import SecureMediaStoresValidation from './secure_media_stores.validation';
+import SecureMediaStoresController from './secure_media_stores.controllers';
 
+const routes=express.Router();
 
-const route=express.Router();
-
-route.post("/create_secure_folder", auth(USER_ROLE.user), validationRequest(SecureFolderValidation.secureFolderSchema), SecureFolderController.createSecureFolder);
-route.get("/getUserMediaMessages", auth(USER_ROLE.user), SecureFolderController.getUserMediaMessages);
-route.post(
+routes.post(
   '/upload_media_file',
   auth(USER_ROLE.user,USER_ROLE.admin,USER_ROLE.superAdmin),
   upload.fields([
@@ -55,8 +50,13 @@ route.post(
       next(new AppError(status.BAD_REQUEST, 'Invalid JSON data', error));
     }
   },
-  validationRequest(MessageValidationSchema.secureFolderMediaFileSchema),
-   SecureFolderController.uploadContentSecureFolder,
+  validationRequest(SecureMediaStoresValidation.secureFolderMediaFileSchema),
+   SecureMediaStoresController.uploadContentSecureFolder,
 );
-const SecureFolderRouter= route;
-export default SecureFolderRouter;
+
+const SecureMediaStoresRoutes=routes;
+
+export default SecureMediaStoresRoutes;
+
+
+

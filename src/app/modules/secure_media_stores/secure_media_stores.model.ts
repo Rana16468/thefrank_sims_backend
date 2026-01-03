@@ -1,17 +1,16 @@
 import mongoose, { model, Schema } from 'mongoose';
-import { IMessage, IEncryptedField } from './message.interface';
+import { IEncryptedField,ISecureMediaStores } from './secure_media_stores.interface';
 
-// 🔒 Sub-schema for encrypted fields
 const EncryptedFieldSchema = new Schema<IEncryptedField>(
   {
     ciphertext: { type: String, required: true },
     iv: { type: String, required: true },
     tag: { type: String, required: true },
   },
-  { _id: false } // prevent Mongoose from creating _id for each encrypted object
+  { _id: false } 
 );
 
-const messageSchema = new Schema<IMessage>(
+const secureMediaStoresSchema = new Schema<ISecureMediaStores>(
   {
     text: {
       type: EncryptedFieldSchema,
@@ -24,27 +23,19 @@ const messageSchema = new Schema<IMessage>(
     },
     audioUrl: {
       type: EncryptedFieldSchema,
-      required:false,
-      default: null,
-    },
-    seen: {
-      type: Boolean,
-      default: false,
+      required:false
+     
     },
     ephemPublicKey: {
       type: String,
       required: [true, 'ephemPublicKey is required'],
     },
-    msgByUserId: {
+    userId: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
       ref: 'users',
-    },
-    conversationId: {
-      type: mongoose.Schema.Types.ObjectId,
-      required: false,
-      ref: 'conversations',
-    },
+    }
+ 
   },
   {
     timestamps: true,
@@ -52,6 +43,22 @@ const messageSchema = new Schema<IMessage>(
   }
 );
 
-const messages = model<IMessage>('messages', messageSchema);
+secureMediaStoresSchema.pre("find", function (next) {
+  this.where({ isDelete: { $ne: true } });
+  next();
+});
 
-export default messages;
+secureMediaStoresSchema.pre("findOne", function (next) {
+  this.where({ isDelete: { $ne: true } });
+  next();
+});
+
+secureMediaStoresSchema.pre("aggregate", function (next) {
+  this.pipeline().unshift({ $match: { isDelete: { $ne: true } } });
+  next();
+});
+
+
+const securemediastores = model<ISecureMediaStores>('securemediastores', secureMediaStoresSchema);
+
+export default securemediastores;

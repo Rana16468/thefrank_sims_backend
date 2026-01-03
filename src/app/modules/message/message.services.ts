@@ -30,7 +30,7 @@ interface NewMessagePayload {
   chat?: "singlechat" | "groupchat";
 }
 
-export const new_message_IntoDb = async (
+ const new_message_IntoDb = async (
   user: JwtPayloads,
   data: NewMessagePayload
 ) => {
