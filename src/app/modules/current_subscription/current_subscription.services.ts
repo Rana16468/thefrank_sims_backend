@@ -148,7 +148,7 @@ const findByMyActiveCurrentSubscriptionIntoDb = async (
     subscriptionPrice: {
       $arrayElemAt: [
         {
-          $filter: {
+           $filter: {
             input: "$subscriptionDetails.subscriptionPrice",
             as: "p",
             cond: { $eq: ["$$p._id", "$subscriptionPriceId"] }
@@ -174,9 +174,11 @@ const findByMyActiveCurrentSubscriptionIntoDb = async (
 };
 
 const findByAllActiveSubscriptionListIntoDb=async(query: Record<string, unknown>)=>{
-  const allActiveSubscriptionQuery = new QueryBuilder(
+   try{
+
+    const allActiveSubscriptionQuery = new QueryBuilder(
       currentsubscriptions
-        .find({ isActive:true }).populate(
+        .find({}).populate(
           [
           {
             path: 'userId',
@@ -197,11 +199,44 @@ const findByAllActiveSubscriptionListIntoDb=async(query: Record<string, unknown>
 
     return { meta, allActiveSubscriber };
 
+   }
+   catch(error:any){
+    throw new AppError(status.SERVICE_UNAVAILABLE,'find By All Active Subscription List IntoDb server unavailable')
+   }
+
+};
+
+
+const updateActiveStatusAdminIntoDb=async(currentSubscriberId:string, payload:Partial<TCurrentSubscription>)=>{
+  
+
+  try{
+
+    const result=await currentsubscriptions.findByIdAndUpdate(currentSubscriberId,{isActive:payload?.isActive},{new:true, upsert:true});
+
+    if(!result){
+      throw new AppError(status.NOT_EXTENDED, 'issues by the current subscription section status change','');
+    };
+
+    return {
+      status:true , 
+      message:"successfully change status"
+    }
+
+  }
+   catch(error:any){
+    throw new AppError(status.SERVICE_UNAVAILABLE,' update Active Status Admin IntoDb server unavailable')
+   }
+
 }
 
 
 
 
-const currentSubscriptionServices={ recorded_subscription_IntoDb, findByMyActiveCurrentSubscriptionIntoDb, findByAllActiveSubscriptionListIntoDb }
+const currentSubscriptionServices={ 
+  recorded_subscription_IntoDb, 
+  findByMyActiveCurrentSubscriptionIntoDb, 
+  findByAllActiveSubscriptionListIntoDb ,
+   updateActiveStatusAdminIntoDb}
 
 export default currentSubscriptionServices;

@@ -46,12 +46,26 @@ const findByAllActiveSubscriptionList:RequestHandler=catchAsync(async(req , res)
 });
 
 
+const updateActiveStatusAdmin:RequestHandler=catchAsync(async(req , res)=>{
+
+     const result=await currentSubscriptionServices.updateActiveStatusAdminIntoDb(req.params.currentSubscriberId, req.body);
+     sendResponse(res, {
+         success: true,
+         statusCode: status.OK,
+         message: "Successfully Change Status",
+         data: result,
+       });  
+
+})
+
+
 
 
 const currentSubscriptionController={
      recorded_subscription,
       findByMyActiveCurrentSubscription,
-      findByAllActiveSubscriptionList
+      findByAllActiveSubscriptionList,
+      updateActiveStatusAdmin
 };
 
 export default currentSubscriptionController;

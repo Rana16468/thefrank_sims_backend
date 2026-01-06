@@ -11,7 +11,7 @@ const route=express.Router();
 route.post("/recorded_subscription", auth(USER_ROLE.user), validationRequest(CurrentSubscriptionValidation.currentSubscriptionSchema), currentSubscriptionController.recorded_subscription);
 route.get("/find_my_active_current_subscription", auth(USER_ROLE.user), currentSubscriptionController.findByMyActiveCurrentSubscription);
 route.get("/find_by_all_active_subscriber_list", auth(USER_ROLE.admin, USER_ROLE.superAdmin), currentSubscriptionController.findByAllActiveSubscriptionList);
-
+route.patch("/update_active_status_admin/:currentSubscriberId", auth(USER_ROLE.admin,USER_ROLE.superAdmin), validationRequest(CurrentSubscriptionValidation.updateStatusSchema), currentSubscriptionController.updateActiveStatusAdmin)
 const CurrentSubscriptionRoute=route;
 
 export default CurrentSubscriptionRoute;

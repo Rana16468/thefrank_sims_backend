@@ -14,8 +14,18 @@ const currentSubscriptionSchema = z.object({
   }),
 });
 
+
+const updateStatusSchema=z.object({
+  body:z.object({
+    isActive: z.boolean({error:"is active is required"})
+  })
+    
+  
+});
+
 const CurrentSubscriptionValidation= {
-    currentSubscriptionSchema
+    currentSubscriptionSchema,
+    updateStatusSchema
 };
 
 export default CurrentSubscriptionValidation;
