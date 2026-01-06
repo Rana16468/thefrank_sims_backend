@@ -33,9 +33,25 @@ const findByMyActiveCurrentSubscription:RequestHandler=catchAsync(async(req , re
 });
 
 
+const findByAllActiveSubscriptionList:RequestHandler=catchAsync(async(req , res)=>{
+
+     const result=await currentSubscriptionServices.findByAllActiveSubscriptionListIntoDb(req.query);
+     sendResponse(res, {
+         success: true,
+         statusCode: status.OK,
+         message: "Successfully Find By All Active Subscriber List",
+         data: result,
+       });  
+
+});
+
+
+
+
 const currentSubscriptionController={
      recorded_subscription,
-      findByMyActiveCurrentSubscription
+      findByMyActiveCurrentSubscription,
+      findByAllActiveSubscriptionList
 };
 
 export default currentSubscriptionController;

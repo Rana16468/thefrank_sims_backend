@@ -21,6 +21,7 @@ const CurrentSubscriptionSchema = new Schema<TCurrentSubscription, CurrentSubscr
 
     isActive: {
       type: Boolean,
+      index:true,
       default: true,
     },
 

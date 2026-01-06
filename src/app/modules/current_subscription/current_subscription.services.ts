@@ -173,9 +173,35 @@ const findByMyActiveCurrentSubscriptionIntoDb = async (
   }
 };
 
+const findByAllActiveSubscriptionListIntoDb=async(query: Record<string, unknown>)=>{
+  const allActiveSubscriptionQuery = new QueryBuilder(
+      currentsubscriptions
+        .find({ isActive:true }).populate(
+          [
+          {
+            path: 'userId',
+            select: 'name email  photo',
+          }  
+        ]
+        ),
+      query,
+    )
+      .search([])
+      .filter()
+      .sort()
+      .paginate()
+      .fields();
+
+    const allActiveSubscriber = await allActiveSubscriptionQuery.modelQuery;
+    const meta = await allActiveSubscriptionQuery.countTotal();
+
+    return { meta, allActiveSubscriber };
+
+}
 
 
 
-const currentSubscriptionServices={ recorded_subscription_IntoDb, findByMyActiveCurrentSubscriptionIntoDb }
+
+const currentSubscriptionServices={ recorded_subscription_IntoDb, findByMyActiveCurrentSubscriptionIntoDb, findByAllActiveSubscriptionListIntoDb }
 
 export default currentSubscriptionServices;
