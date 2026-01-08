@@ -2,6 +2,7 @@ import status from "http-status";
 import AppError from "../../errors/AppError";
 import { TSubscription } from "./subscription.interface";
 import subscriptions from "./subscription.model";
+import QueryBuilder from "../../builder/QueryBuilder";
 
 
 
@@ -24,8 +25,37 @@ const createSubscriptionIntoDb=async(payload:TSubscription)=>{
     }
 };
 
+   const findByAllSubscriptionIntoDb=async(query: Record<string, unknown>)=>{
+
+ try {
+    const allSubscriptionQuery = new QueryBuilder(
+      subscriptions
+        .find({  }),
+        
+      query,
+    )
+      .search([])
+      .filter()
+      .sort()
+      .paginate()
+      .fields();
+
+    const all_subscription_list = await allSubscriptionQuery.modelQuery;
+    const meta = await allSubscriptionQuery.countTotal();
+
+    return { meta, all_subscription_list };
+  } catch (error: any) {
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      "find By All Subscription IntoDb server unavailable",
+      error,
+    );
+   }
+}
+
 
 const subscriptionServices={
-    createSubscriptionIntoDb
+    createSubscriptionIntoDb,
+    findByAllSubscriptionIntoDb
 };
 export default subscriptionServices

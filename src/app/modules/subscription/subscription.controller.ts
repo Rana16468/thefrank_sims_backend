@@ -15,11 +15,22 @@ const createSubscription:RequestHandler=catchAsync(async(req , res)=>{
          message: "Successfully Recorded",
          data: result,
        });
-
-
 });
 
+const findByAllSubscription:RequestHandler=catchAsync(async(req , res)=>{
+
+
+      const result=await subscriptionServices.findByAllSubscriptionIntoDb(req.query);
+           sendResponse(res, {
+         success: true,
+         statusCode: status.OK,
+         message: "Successfully Find By All Subscription",
+         data: result,
+       });
+})
+
 const subscriptionController={
-    createSubscription
+    createSubscription,
+    findByAllSubscription
 };
 export default subscriptionController;

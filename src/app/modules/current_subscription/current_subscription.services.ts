@@ -144,6 +144,8 @@ const findByMyActiveCurrentSubscriptionIntoDb = async (
     typesubscription: 1,
     subscriptionId: 1,
     subscriptionPriceId: 1,
+     
+createdAt:1,
 
     subscriptionPrice: {
       $arrayElemAt: [
@@ -231,12 +233,95 @@ const updateActiveStatusAdminIntoDb=async(currentSubscriberId:string, payload:Pa
 }
 
 
+const getCurrentSubscriberGrowthIntoDb = async (query: { year?: string }) => {
+  try {
+    const year = query.year ? parseInt(query.year) : new Date().getFullYear();
+
+    const stats = await currentsubscriptions.aggregate([
+      {
+        $match: {
+          createdAt: {
+            $gte: new Date(`${year}-01-01T00:00:00.000Z`),
+            $lte: new Date(`${year}-12-31T23:59:59.999Z`),
+          },
+        },
+      },
+      {
+        $group: {
+          _id: { month: { $month: "$createdAt" } },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        $project: {
+          month: "$_id.month",
+          count: 1,
+          _id: 0,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          data: { $push: { month: "$month", count: "$count" } },
+        },
+      },
+
+      {
+        $project: {
+          months: {
+            $map: {
+              input: { $range: [1, 13] },
+              as: "m",
+              in: {
+                year: year,
+                month: "$$m",
+                count: {
+                  $let: {
+                    vars: {
+                      matched: {
+                        $arrayElemAt: [
+                          {
+                            $filter: {
+                              input: "$data",
+                              as: "d",
+                              cond: { $eq: ["$$d.month", "$$m"] },
+                            },
+                          },
+                          0,
+                        ],
+                      },
+                    },
+                    in: { $ifNull: ["$$matched.count", 0] },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      { $unwind: "$months" },
+      { $replaceRoot: { newRoot: "$months" } },
+    ]);
+
+    return { monthlyStats: stats };
+  } catch (error: any) {
+    throw new AppError(
+      status.INTERNAL_SERVER_ERROR,
+      "Failed to fetch user creation stats",
+      error,
+    );
+  }
+};
+
+
 
 
 const currentSubscriptionServices={ 
   recorded_subscription_IntoDb, 
   findByMyActiveCurrentSubscriptionIntoDb, 
   findByAllActiveSubscriptionListIntoDb ,
-   updateActiveStatusAdminIntoDb}
+   updateActiveStatusAdminIntoDb , 
+   getCurrentSubscriberGrowthIntoDb
+  }
 
 export default currentSubscriptionServices;

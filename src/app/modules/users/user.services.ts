@@ -43,7 +43,7 @@ const createUserIntoDb = async (payload: TUser) => {
     const email = payload.email;
 
     // Check if user already exists
-    const existingUser = await users.findOne({ email });
+    const existingUser = await users.findOne({ email , isVerify:true});
     if (existingUser) {
       throw new AppError(
         httpStatus.CONFLICT,

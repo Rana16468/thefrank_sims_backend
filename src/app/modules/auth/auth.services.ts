@@ -222,7 +222,7 @@ const findByAllUsersAdminIntoDb = async (query: Record<string, unknown>) => {
       users
         .find({ isVerify: true, isDelete: false })
         .select(
-          "name email phoneNumber location photo recoveryKey  createdAt status",
+          "name email  location photo recoveryKey  createdAt status",
         ),
       query,
     )

@@ -56,6 +56,18 @@ const updateActiveStatusAdmin:RequestHandler=catchAsync(async(req , res)=>{
          data: result,
        });  
 
+});
+
+
+const getCurrentSubscriberGrowth:RequestHandler=catchAsync(async(req , res)=>{
+
+     const result=await currentSubscriptionServices.getCurrentSubscriberGrowthIntoDb(req.query);
+      sendResponse(res, {
+         success: true,
+         statusCode: status.OK,
+         message: "Successfully Find By Current Subscriber Growth",
+         data: result,
+       });  
 })
 
 
@@ -65,7 +77,8 @@ const currentSubscriptionController={
      recorded_subscription,
       findByMyActiveCurrentSubscription,
       findByAllActiveSubscriptionList,
-      updateActiveStatusAdmin
+      updateActiveStatusAdmin,
+      getCurrentSubscriberGrowth
 };
 
 export default currentSubscriptionController;
