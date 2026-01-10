@@ -111,7 +111,37 @@ const recoveryKey:RequestHandler=catchAsync(async(req , res)=>{
     message: "Successfully Complete Your Recovery",
     data: result,
   });
-})
+});
+
+
+const findByAllUserChatList:RequestHandler=catchAsync(async(req , res)=>{
+
+
+    const result=await AuthServices.findByAllUserChatListIntoDb(req.query);
+    sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Successfully Find By All Chat List",
+    data: result,
+  });
+
+});
+
+
+const findBySpecificUserProfile:RequestHandler=catchAsync(async(req , res)=>{
+
+  const result=await AuthServices.findBySpecificUserProfileIntoDb(req.params.userId);
+
+      sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Successfully Find By Specific User Profile",
+    data: result,
+  });
+
+
+    
+});
 
 
 
@@ -128,7 +158,9 @@ const AuthController = {
   deleteAccount,
    isBlockAccount,
    getUserGrowth,
-    recoveryKey
+    recoveryKey,
+    findByAllUserChatList,
+     findBySpecificUserProfile
 
 };
 

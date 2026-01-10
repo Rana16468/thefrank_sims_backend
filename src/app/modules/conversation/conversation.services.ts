@@ -32,6 +32,12 @@ const getConversation = async (
       participants: { $in: matchingUserIds },
     };
   }
+
+
+  console.log(query)
+
+
+
   const currentUserConversationQuery = new QueryBuilder(
     conversations.find({
       participants: profileObjectId,
@@ -41,7 +47,7 @@ const getConversation = async (
       .populate({ path: 'participants', select: 'name photo _id email' })
       .populate('lastMessage'),
     query,
-  )
+  ).search(["chat"])
     .fields()
     .filter()
     .paginate()
@@ -124,7 +130,7 @@ const getSingleConversationListIntoDb = async (currentUserId: string, query:  Re
          
         // },
         ]) 
-, query)
+, query).search(["chat"])
       .filter()
       .sort()
       .paginate()
@@ -256,6 +262,25 @@ const createGroupConversationIntoDb = async (
   }
 };
 
+const addedNewUserConversationIntoDb=async(payload:{conversationId:string, userId:string})=>{
+
+
+  try{
+
+    return payload
+
+  }
+  catch (error: any) {
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      error.message ||
+        "Issue while creating added New User Conversation intoDb"
+    );
+  }
+
+   
+}
+
 
 
 
@@ -270,7 +295,8 @@ const ConversationService = {
   allConversationIntoDb,
    getSingleConversationListIntoDb,
    getGroupConversationListIntoDb,
- createGroupConversationIntoDb
+ createGroupConversationIntoDb,
+ addedNewUserConversationIntoDb
 };
 
 export default ConversationService;

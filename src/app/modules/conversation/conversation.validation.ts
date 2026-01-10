@@ -14,10 +14,18 @@ const createConversationGroupSchema=z.object({
     })
 });
 
+const addedNewUserConversationSchema= z.object({
+    body: z.object({
+        conversationId:z.string({error:"conversationId is required"}),
+        userId: z.string({error:"userId is required"})
+    })
+})
+
 
 
 const ConversationValidation={
-    createConversationGroupSchema
+    createConversationGroupSchema,
+    addedNewUserConversationSchema
 };
 
 export default ConversationValidation;

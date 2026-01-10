@@ -437,6 +437,57 @@ const recoveryKeyIntoDb = async (payload: Partial<TUser>) => {
   };
 };
 
+const findByAllUserChatListIntoDb=async(query: Record<string, unknown>)=>{
+
+    try{
+
+       const allUsersdQuery = new QueryBuilder(
+      users
+        .find({ isVerify: true, role:USER_ROLE.user })
+        .select(
+          "name  photo   _id online",
+        ),
+      query,
+    )
+      .search(user_search_filed)
+      .filter()
+      .sort()
+      .paginate()
+      .fields();
+
+    const all_users = await allUsersdQuery.modelQuery;
+    const meta = await allUsersdQuery.countTotal();
+
+    return { meta, all_users };
+
+    }
+    catch(error:any){
+      throw new AppError(
+      httpStatus.SERVICE_UNAVAILABLE,
+      "Block account operation failed",
+      error,
+    );
+    }
+};
+
+const findBySpecificUserProfileIntoDb=async(userId:string)=>{
+
+
+    try{
+
+      return  await users.findById(userId).select("name photo online");
+
+
+    }
+     catch(error:any){
+      throw new AppError(
+      httpStatus.SERVICE_UNAVAILABLE,
+      "find B Specific User Profile IntoDb failed",
+      error,
+    );
+    }
+}
+
 const AuthServices = {
   loginUserIntoDb,
   refreshTokenIntoDb,
@@ -447,7 +498,9 @@ const AuthServices = {
 
   getUserGrowthIntoDb,
   isBlockAccountIntoDb,
-  recoveryKeyIntoDb
+  recoveryKeyIntoDb,
+  findByAllUserChatListIntoDb,
+  findBySpecificUserProfileIntoDb
 };
 
 export default AuthServices;

@@ -79,7 +79,10 @@ router.patch(
   AuthController.isBlockAccount,
 );
 
-router.post("/recoveryKey", auth(USER_ROLE.user), validationRequest(LoginValidationSchema. recoveryKeySchema), AuthController.recoveryKey);
+router.post("/recoveryKey", validationRequest(LoginValidationSchema. recoveryKeySchema), AuthController.recoveryKey);
+
+router.get("/find_by_all_user_chat_list", auth(USER_ROLE.user), AuthController.findByAllUserChatList);
+router.get("/find_by_specific_user_profile/:userId", auth(USER_ROLE.user), AuthController.findBySpecificUserProfile);
 
 
 const AuthRouter = router;

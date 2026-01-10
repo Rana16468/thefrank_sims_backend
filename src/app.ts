@@ -10,6 +10,7 @@ import status from "http-status";
 import auto_detected_subscription_expiry_date from "./app/utils/auto_detected_subscription_expiry_date";
 import config from "./app/config";
 import path from "path";
+import cookieParser from "cookie-parser";
 
 const app: Application = express();
 
@@ -27,7 +28,7 @@ app.use(
 );
 
 
-
+app.use(cookieParser());
 // router setup
 app.use("/api/v1", router);
 
