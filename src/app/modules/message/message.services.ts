@@ -402,7 +402,7 @@ const userPrivateKeyList = await users.find(
 
   // all possible private keys (sender + receiver)
   const possiblePrivateKeys = userPrivateKeyList
-    .map((u: any) => u.privateKey)
+    .map((u: any) => u?.privateKey)
     .filter(Boolean);
 
   let decryptedText = "[Unable to decrypt]";
@@ -438,7 +438,7 @@ const userPrivateKeyList = await users.find(
     } catch (err) {
       // ❌ wrong private key → try next one
       continue;
-    }
+    };  
   }
 
   return {
