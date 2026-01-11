@@ -9,6 +9,7 @@ import status from 'http-status';
 import users from '../users/users.model';
 import { IConversation } from './conversation.interface';
 import currentsubscriptions from '../current_subscription/current_subscription.model';
+import { CHAT_TYPE } from './conversation.constant';
 
 
 
@@ -262,24 +263,61 @@ const createGroupConversationIntoDb = async (
   }
 };
 
-const addedNewUserConversationIntoDb=async(payload:{conversationId:string, userId:string})=>{
+const addedNewUserConversationIntoDb = async (payload: {
+  conversationId: string;
+  userId: string;
+}) => {
+  try {
+    const conversation = await conversations
+      .findById(payload.conversationId)
+      .select("chat participants");
 
+    if (!conversation) {
+      return {
+        status: false,
+        message: "Conversation not found",
+      };
+    }
 
-  try{
+    if (conversation.chat !== CHAT_TYPE.groupchat) {
+      return {
+        status: false,
+        message: "This is not a group chat",
+      };
+    }
 
-    return payload
+    const userObjectId = new Types.ObjectId(payload.userId);
 
-  }
-  catch (error: any) {
+    // ✅ Type-safe ObjectId comparison
+    const isAlreadyJoined = conversation.participants.some(
+      (id: Types.ObjectId) => id.equals(userObjectId)
+    );
+
+    if (isAlreadyJoined) {
+      return {
+        status: false,
+        message: "User already joined this group",
+      };
+    }
+
+    await conversations.updateOne(
+      { _id: payload.conversationId },
+      { $addToSet: { participants: userObjectId } }
+    );
+
+    return {
+      status: true,
+      message: "User added to group conversation successfully",
+    };
+  } catch (error: any) {
     throw new AppError(
       status.SERVICE_UNAVAILABLE,
-      error.message ||
-        "Issue while creating added New User Conversation intoDb"
+      error.message || "Issue while adding user to conversation"
     );
   }
+};
 
-   
-}
+
 
 
 

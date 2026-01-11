@@ -22,5 +22,5 @@ router.get("/specific_event_wise_conversation/:currentSubId", auth(USER_ROLE.use
 router.get("/get_single_conversation", auth(USER_ROLE.user),ConversationController.getSingleConversationList)
 router.get("/get_group_conversation/:eventId", auth(USER_ROLE.user,USER_ROLE.admin,USER_ROLE.superAdmin), ConversationController.getGroupConversationList)
 router.post("/create_group", auth(USER_ROLE.user), validationRequest(ConversationValidation.createConversationGroupSchema), ConversationController.createGroupConversation);
-
+router.post("/added_new_user_conversation", auth(USER_ROLE.user), validationRequest(ConversationValidation.addedNewUserConversationSchema), ConversationController.addedNewUserConversation);
 export const conversationRoutes = router;

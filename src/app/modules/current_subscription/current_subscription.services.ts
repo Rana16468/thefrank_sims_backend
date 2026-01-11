@@ -73,9 +73,7 @@ const recorded_subscription_IntoDb = async (
 };
 
 
-const findByMyActiveCurrentSubscriptionIntoDb = async (
-  userId: string
-) => {
+const findByMyActiveCurrentSubscriptionIntoDb = async (userId: string) => {
   try {
     let userIdMatch: any;
 
@@ -102,7 +100,8 @@ const findByMyActiveCurrentSubscriptionIntoDb = async (
           ],
           free: [
             { $match: { typesubscription: "free" } },
-            { $sort: { createdAt: -1 } }
+            { $sort: { createdAt: -1 } },
+            { $limit: 1 }
           ]
         }
       },
@@ -117,63 +116,75 @@ const findByMyActiveCurrentSubscriptionIntoDb = async (
           }
         }
       },
-      { $unwind: { path: "$result", preserveNullAndEmptyArrays: true } },
+      { $unwind: "$result" },
       { $replaceRoot: { newRoot: "$result" } },
-
       {
         $lookup: {
-          from: "subscriptions",         
-          localField: "subscriptionId",  
-          foreignField: "_id",           
+          from: "subscriptions",
+          localField: "subscriptionId",
+          foreignField: "_id",
           as: "subscriptionDetails"
         }
       },
-
-      // flatten
       {
         $unwind: {
           path: "$subscriptionDetails",
           preserveNullAndEmptyArrays: true
         }
       },
-
-   {
-  $project: {
-    _id: 1,
-    isActive: 1,
-    typesubscription: 1,
-    subscriptionId: 1,
-    subscriptionPriceId: 1,
-     
-createdAt:1,
-
-    subscriptionPrice: {
-      $arrayElemAt: [
-        {
-           $filter: {
-            input: "$subscriptionDetails.subscriptionPrice",
-            as: "p",
-            cond: { $eq: ["$$p._id", "$subscriptionPriceId"] }
+      {
+        $project: {
+          _id: 1,
+          isActive: 1,
+          typesubscription: 1,
+          subscriptionId: 1,
+          subscriptionPriceId: 1,
+          createdAt: 1,
+          subscriptionPrice: {
+            $arrayElemAt: [
+              {
+                $filter: {
+                  input: "$subscriptionDetails.subscriptionPrice",
+                  as: "p",
+                  cond: { $eq: ["$$p._id", "$subscriptionPriceId"] }
+                }
+              },
+              0
+            ]
           }
-        },
-        0
-      ]
-    }
-  }
-}
-
+        }
+      }
     ]);
+
+    // 🔥 STEP 2: Delete all previous subscriptions except current one
+    if (agg.length > 0) {
+      const currentSubscriptionId = agg[0]._id;
+
+      await currentsubscriptions.updateMany(
+        {
+          userId: userIdMatch,
+          _id: { $ne: currentSubscriptionId }
+        },
+        {
+          $set: {
+            isActive: false,
+            isDelete: true
+          }
+        }
+      );
+    }
 
     return agg;
 
   } catch (error: any) {
     throw new AppError(
       status.SERVICE_UNAVAILABLE,
-      "find By All User Admin IntoDb server unavailable",
+      "find By My Active Current Subscription failed",
       error
     );
   }
 };
+
 
 const findByAllActiveSubscriptionListIntoDb=async(query: Record<string, unknown>)=>{
    try{
