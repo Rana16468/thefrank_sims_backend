@@ -53,9 +53,9 @@ export const handleSendMessage = async (
       data.receiverId = admin?._id.toString() || "69347be2a8744afe3e2ec8b8";
     }
 
-    if (data.receiverId === currentUserId) {
-      throw new Error("You can't send message to yourself");
-    }
+    // if (data.receiverId === currentUserId) {
+    //   throw new Error("You can't send message to yourself");
+    // }
 
     const receiverExists = await users
       .exists({ _id: data.receiverId })
