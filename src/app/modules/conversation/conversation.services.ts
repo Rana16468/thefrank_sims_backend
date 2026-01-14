@@ -130,10 +130,9 @@ const getSingleConversationListIntoDb = async (currentUserId: string, query:  Re
         //   select: "text  createdAt",
          
         // },
-        ]) 
+        ]) .sort({ updatedAt: -1 })
 , query).search(["chat"])
       .filter()
-      .sort()
       .paginate()
       .fields();
 

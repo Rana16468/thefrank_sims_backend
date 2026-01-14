@@ -35,7 +35,7 @@ app.use("/api/v1", router);
 app.get("/", (_req, res) => {
   res.send({
     status: true,
-    message: "Welcome to thefrank_sims_backend backend Api",
+    message: "Welcome to the frank_sims_backend backend Api",
   });
 });
 
@@ -50,6 +50,8 @@ cron.schedule("*/10 * * * *", async () => {
     );
   }
 });
+
+
 
 cron.schedule("*/10 * * * *", async () => {
   try {
