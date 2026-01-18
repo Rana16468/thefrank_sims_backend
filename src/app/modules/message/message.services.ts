@@ -38,15 +38,11 @@ interface NewMessagePayload {
   session.startTransaction();
 
   try {
-    // -----------------------
-    // 1) Basic validations
-    // -----------------------
+   
     if (!user?.id) throw new AppError(httpStatus.UNAUTHORIZED, "User ID missing", "");
     if (!data?.receiverId) throw new AppError(httpStatus.BAD_REQUEST, "Receiver ID required", "");
 
-    // -----------------------
-    // 2) Get receiver (must have publicKey)
-    // -----------------------
+   
     const receiver = await users
       .findById(data.receiverId)
       .select("publicKey")
@@ -55,9 +51,7 @@ interface NewMessagePayload {
     if (!receiver) throw new AppError(httpStatus.NOT_FOUND, "Receiver not found", "");
     if (!receiver.publicKey) throw new AppError(httpStatus.BAD_REQUEST, "Receiver public key missing", "");
 
-    // -----------------------
-    // 3) Find or create conversation
-    // -----------------------
+ 
     let conversation = await conversations
       .findOne({
         _id: data.conversationId,
@@ -65,6 +59,8 @@ interface NewMessagePayload {
         participants: { $all: [user.id, data.receiverId] },
       })
       .session(session);
+
+    
 
     let isNewConversation = false;
 
@@ -87,21 +83,18 @@ interface NewMessagePayload {
       throw new AppError(httpStatus.INTERNAL_SERVER_ERROR, "Conversation creation failed", "");
     }
 
-    // -----------------------
-    // 4) Encryption using receiver's publicKey (ECDH)
-    // -----------------------
     const recipientPub = Buffer.from(receiver.publicKey, "base64");
     const ephem = crypto.createECDH("prime256v1");
     ephem.generateKeys();
     const sharedSecret = ephem.computeSecret(recipientPub);
 
-    // Encrypt text (if exists)
+  
     let encryptedText
     if (data.text) {
       encryptedText = cryptoUtils.encryptMessage(sharedSecret, data.text);
     }
 
-    // Encrypt images (if exists)
+    
     let imageUrlEncrypted: { ciphertext: string; iv: string; tag: string }[] = [];
     if (Array.isArray(data.imageUrl) && data.imageUrl.length > 0) {
       imageUrlEncrypted = data.imageUrl.map((img) =>
@@ -109,13 +102,13 @@ interface NewMessagePayload {
       );
     }
 
-    // Encrypt audio (if exists)
+    
     let audioEncrypted: { ciphertext: string; iv: string; tag: string } | undefined;
     if (data.audioUrl) {
       audioEncrypted = cryptoUtils.encryptMessage(sharedSecret, data.audioUrl);
     }
 
-    // Ensure at least one content exists
+    
     if (!encryptedText && imageUrlEncrypted.length === 0 && !audioEncrypted) {
       throw new AppError(
         httpStatus.BAD_REQUEST,
@@ -124,9 +117,7 @@ interface NewMessagePayload {
       );
     }
 
-    // -----------------------
-    // 5) Persist message inside transaction
-    // -----------------------
+    
     const newMessage = await messages.create(
       [
         {
@@ -144,24 +135,18 @@ interface NewMessagePayload {
 
     const savedMessage = newMessage[0];
 
-    // -----------------------
-    // 6) Update conversation.lastMessage
-    // -----------------------
+   
     await conversations.updateOne(
       { _id: conversation._id },
       { lastMessage: savedMessage._id },
       { session }
     );
 
-    // -----------------------
-    // 7) Commit transaction
-    // -----------------------
+   
     await session.commitTransaction();
     session.endSession();
 
-    // -----------------------
-    // 8) Socket handling + emits
-    // -----------------------
+    
     const io = getSocketIO();
     const roomId = conversation._id.toString();
 
@@ -180,9 +165,7 @@ interface NewMessagePayload {
 
     io.to(roomId).emit("new-message", populatedMsg);
 
-    // -----------------------
-    // 9) Auto-seen logic
-    // -----------------------
+    
     const room = io.sockets.adapter.rooms.get(roomId);
     if (room) {
       for (const socketId of room) {
@@ -201,9 +184,7 @@ interface NewMessagePayload {
       }
     }
 
-    // -----------------------
-    // 10) Notify for new conversation
-    // -----------------------
+    
     if (isNewConversation) {
       io.to(data.receiverId.toString()).emit("conversation-created", {
         conversationId: conversation._id,
