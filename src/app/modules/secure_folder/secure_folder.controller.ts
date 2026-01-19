@@ -39,12 +39,24 @@ const uploadContentSecureFolder:RequestHandler=catchAsync(async(req , res)=>{
     message: 'successfully upload',
     data: result,
   }); 
+});
+
+const isCreateAccountSecureFolder:RequestHandler=catchAsync(async(req , res)=>{
+
+     const result=await SecureFolderServices.isCreateAccountSecureFolderIntoDb(req.user.id);
+            sendResponse(res, {
+    statusCode: status.OK,
+    success: true,
+    message: 'successfully find by folder ',
+    data: result,
+  }); 
 })
 
 const SecureFolderController={
     createSecureFolder,
     getUserMediaMessages,
-    uploadContentSecureFolder
+    uploadContentSecureFolder,
+    isCreateAccountSecureFolder
 };
 
 

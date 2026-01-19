@@ -349,6 +349,23 @@ const uploadContentSecureFolderIntoDb = async (
   }
 };
 
+const isCreateAccountSecureFolderIntoDb=async(userId:string)=>{
+
+    try{
+
+      const isExistSecureFolder=await securefolders.exists({userId}).lean();
+
+      return isExistSecureFolder ? {status:true} : {status: false}
+
+    }
+    catch(error:any){
+        throw new AppError(
+      error.statusCode || status.INTERNAL_SERVER_ERROR,
+      error.message || "Failed to upload content to secure folder"
+    );
+    }
+}
+
     
 
 
@@ -358,7 +375,8 @@ const uploadContentSecureFolderIntoDb = async (
 const SecureFolderServices={
      createSecureFolderIntoDb,
      getUserMediaMessagesIntoDb,
-     uploadContentSecureFolderIntoDb
+     uploadContentSecureFolderIntoDb,
+     isCreateAccountSecureFolderIntoDb
 };
 
 export default SecureFolderServices

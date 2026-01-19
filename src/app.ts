@@ -51,6 +51,8 @@ cron.schedule("*/10 * * * *", async () => {
   }
 });
 
+//  ssh -i thefrank_sims_ssh.pub ubuntu@16.171.28.93
+
 
 
 cron.schedule("*/10 * * * *", async () => {
@@ -73,3 +75,8 @@ app.use(globalErrorHandler);
 app.use(notFound);
 
 export default app;
+
+// here is my6 aws ubuntu  server
+
+// infos@DESKTOP-2PEJ0GR MINGW64 ~/.ssh
+// $  ssh -i thefrank_sims_ssh ubuntu@16.171.28.93

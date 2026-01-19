@@ -58,5 +58,7 @@ route.post(
   validationRequest(MessageValidationSchema.secureFolderMediaFileSchema),
    SecureFolderController.uploadContentSecureFolder,
 );
+
+route.get("/is_create_account_secure_folder", auth(USER_ROLE.user), SecureFolderController.isCreateAccountSecureFolder)
 const SecureFolderRouter= route;
 export default SecureFolderRouter;
