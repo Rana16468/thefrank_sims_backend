@@ -90,6 +90,19 @@ const addedNewUserConversation:RequestHandler=catchAsync(async(req , res)=>{
     message: 'successfully  added user  in the group',
     data: result,
   }); 
+});
+
+const delete_all_conversation:RequestHandler=catchAsync(async(req , res)=>{
+
+
+     const result=await ConversationService.delete_all_conversation_IntoDb(req.user.id);
+ sendResponse(res, {
+    statusCode: httpStatus.OK,
+    success: true,
+    message: 'successfully  delete all message',
+    data: result,
+  }); 
+
 })
 
 
@@ -101,7 +114,8 @@ const ConversationController = {
     getSingleConversationList,
     getGroupConversationList,
     createGroupConversation,
-    addedNewUserConversation
+    addedNewUserConversation,
+    delete_all_conversation
 };
 
 export default ConversationController;

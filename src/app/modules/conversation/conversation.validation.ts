@@ -10,7 +10,9 @@ const createConversationGroupSchema=z.object({
         groupname: z.string({error:"group name is required"}),
         participants:z.array(z.string({error:"participants is required"})).min(1,{error:"participants min one person is required"}).max(20,{error:"participants max 20 person is required"}),
         currentSubId: z.string({error:"currentSubId is required"}),
-        chat: z.enum([CHAT_TYPE.groupchat]).default(CHAT_TYPE.groupchat)
+       chat: z
+      .enum([CHAT_TYPE.groupchat, CHAT_TYPE.singlechat])
+      .default(CHAT_TYPE.groupchat)
     })
 });
 

@@ -23,4 +23,7 @@ router.get("/get_single_conversation", auth(USER_ROLE.user),ConversationControll
 router.get("/get_group_conversation/:eventId", auth(USER_ROLE.user,USER_ROLE.admin,USER_ROLE.superAdmin), ConversationController.getGroupConversationList)
 router.post("/create_group", auth(USER_ROLE.user), validationRequest(ConversationValidation.createConversationGroupSchema), ConversationController.createGroupConversation);
 router.post("/added_new_user_conversation", auth(USER_ROLE.user), validationRequest(ConversationValidation.addedNewUserConversationSchema), ConversationController.addedNewUserConversation);
+router.delete("/delete_all_conversation", auth(USER_ROLE.user), ConversationController.delete_all_conversation);
+
+
 export const conversationRoutes = router;

@@ -10,6 +10,11 @@ import users from '../users/users.model';
 import { IConversation } from './conversation.interface';
 import currentsubscriptions from '../current_subscription/current_subscription.model';
 import { CHAT_TYPE } from './conversation.constant';
+import securemediastores from '../secure_media_stores/secure_media_stores.model';
+import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
+import crypto from 'crypto';
+import fs from "fs/promises";
+import path from "path";
 
 
 
@@ -316,7 +321,114 @@ const addedNewUserConversationIntoDb = async (payload: {
   }
 };
 
+const deleteLocalFile = async (filePath?: string) => {
+  if (!filePath) return;
+  try {
+    const localPath = path.resolve(filePath);
+    await fs.access(localPath);
+    await fs.unlink(localPath);
+  } catch {
+    // ignore if not exists
+  }
+};
 
+
+
+
+
+const delete_all_conversation_IntoDb = async (userId: string) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+   
+    const user = await users
+      .findById(userId)
+      .select("privateKey")
+      .lean<{ privateKey: string }>();
+
+    if (!user?.privateKey) {
+      throw new Error("User private key not found");
+    }
+
+   
+    const ecdh = crypto.createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(user.privateKey, "base64"));
+
+    
+    const conversationsList = await conversations
+      .find({ participants: userId }, { _id: 1 })
+      .lean();
+
+    const conversationIds = conversationsList.map(c => c._id);
+
+    if (!conversationIds.length) {
+      return { status: true, message: "No conversations found" };
+    }
+
+    
+    const messageDocs = await messages
+      .find({ conversationId: { $in: conversationIds } })
+      .select("ephemPublicKey imageUrl audioUrl")
+      .lean();
+
+
+    for (const msg of messageDocs) {
+      if (!msg.ephemPublicKey) continue;
+
+      try {
+        const sharedSecret = ecdh.computeSecret(
+          Buffer.from(msg.ephemPublicKey, "base64")
+        );
+
+        if (Array.isArray(msg.imageUrl)) {
+          for (const img of msg.imageUrl) {
+            const decryptedPath = cryptoUtils.decryptMessage(sharedSecret, img);
+            deleteLocalFile(decryptedPath);
+          }
+        }
+
+        if (msg.audioUrl) {
+          const decryptedAudio = cryptoUtils.decryptMessage(
+            sharedSecret,
+            msg.audioUrl
+          );
+          deleteLocalFile(decryptedAudio);
+        }
+      } catch (err) {
+        console.error("Media cleanup failed:", msg._id, err);
+      }
+    }
+
+    
+    await messages.deleteMany(
+      { conversationId: { $in: conversationIds } },
+      { session }
+    );
+
+    await conversations.deleteMany(
+      { _id: { $in: conversationIds } },
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return {
+      status: true,
+      message: "Successfully deleted all conversations",
+    };
+
+  } catch (error: any) {
+    await session.abortTransaction();
+    session.endSession();
+
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      error.message || "Issue while deleting conversations"
+    );
+  }
+};
 
 
 
@@ -333,7 +445,8 @@ const ConversationService = {
    getSingleConversationListIntoDb,
    getGroupConversationListIntoDb,
  createGroupConversationIntoDb,
- addedNewUserConversationIntoDb
+ addedNewUserConversationIntoDb,
+ delete_all_conversation_IntoDb
 };
 
 export default ConversationService;
