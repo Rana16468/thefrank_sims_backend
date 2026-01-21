@@ -10,7 +10,6 @@ import users from '../users/users.model';
 import { IConversation } from './conversation.interface';
 import currentsubscriptions from '../current_subscription/current_subscription.model';
 import { CHAT_TYPE } from './conversation.constant';
-import securemediastores from '../secure_media_stores/secure_media_stores.model';
 import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
 import crypto from 'crypto';
 import fs from "fs/promises";
@@ -40,7 +39,7 @@ const getConversation = async (
   }
 
 
-  console.log(query)
+
 
 
 
@@ -341,7 +340,7 @@ const delete_all_conversation_IntoDb = async (userId: string) => {
   session.startTransaction();
 
   try {
-   
+ 
     const user = await users
       .findById(userId)
       .select("privateKey")
@@ -352,55 +351,81 @@ const delete_all_conversation_IntoDb = async (userId: string) => {
     }
 
    
-    const ecdh = crypto.createECDH("prime256v1");
-    ecdh.setPrivateKey(Buffer.from(user.privateKey, "base64"));
-
-    
-    const conversationsList = await conversations
-      .find({ participants: userId }, { _id: 1 })
+    const conversationDocs = await conversations
+      .find({ participants: userId }, { _id: 1, participants: 1 })
       .lean();
 
-    const conversationIds = conversationsList.map(c => c._id);
-
-    if (!conversationIds.length) {
+    if (!conversationDocs.length) {
       return { status: true, message: "No conversations found" };
     }
 
-    
+    const conversationIds = conversationDocs.map(c => c._id);
+
+    /* --------------------------------------------------
+     🔑 Fetch all participant private keys
+    -------------------------------------------------- */
+    const participantIds = [
+      ...new Set(conversationDocs.flatMap(c => c.participants)),
+    ];
+
+    const privateKeyDocs = await users
+      .find({ _id: { $in: participantIds } })
+      .select("privateKey")
+      .lean();
+
+    const privateKeys = privateKeyDocs
+      .map(u => u.privateKey)
+      .filter(Boolean);
+
+    /* --------------------------------------------------
+     📦 Fetch messages for media cleanup
+    -------------------------------------------------- */
     const messageDocs = await messages
       .find({ conversationId: { $in: conversationIds } })
       .select("ephemPublicKey imageUrl audioUrl")
       .lean();
 
-
+    /* --------------------------------------------------
+     🧹 Decrypt & delete media files
+    -------------------------------------------------- */
     for (const msg of messageDocs) {
       if (!msg.ephemPublicKey) continue;
 
-      try {
-        const sharedSecret = ecdh.computeSecret(
-          Buffer.from(msg.ephemPublicKey, "base64")
-        );
+      const ephemKeyBuffer = Buffer.from(msg.ephemPublicKey, "base64");
 
-        if (Array.isArray(msg.imageUrl)) {
-          for (const img of msg.imageUrl) {
-            const decryptedPath = cryptoUtils.decryptMessage(sharedSecret, img);
-            deleteLocalFile(decryptedPath);
+      for (const privateKey of privateKeys) {
+        try {
+          const ecdh = crypto.createECDH("prime256v1");
+          ecdh.setPrivateKey(Buffer.from(privateKey, "base64"));
+
+          const sharedSecret = ecdh.computeSecret(ephemKeyBuffer);
+
+          // 🖼 Delete images
+          if (Array.isArray(msg.imageUrl)) {
+            for (const img of msg.imageUrl) {
+              const decryptedPath =
+                cryptoUtils.decryptMessage(sharedSecret, img);
+              deleteLocalFile(decryptedPath);
+            }
           }
-        }
 
-        if (msg.audioUrl) {
-          const decryptedAudio = cryptoUtils.decryptMessage(
-            sharedSecret,
-            msg.audioUrl
-          );
-          deleteLocalFile(decryptedAudio);
+          // 🎧 Delete audio
+          if (msg.audioUrl) {
+            const decryptedAudio =
+              cryptoUtils.decryptMessage(sharedSecret, msg.audioUrl);
+            deleteLocalFile(decryptedAudio);
+          }
+
+          break; // ✅ correct key found
+        } catch {
+          continue; // ❌ try next private key
         }
-      } catch (err) {
-        console.error("Media cleanup failed:", msg._id, err);
       }
     }
 
-    
+    /* --------------------------------------------------
+     🗑 Delete messages & conversations
+    -------------------------------------------------- */
     await messages.deleteMany(
       { conversationId: { $in: conversationIds } },
       { session }
@@ -416,37 +441,29 @@ const delete_all_conversation_IntoDb = async (userId: string) => {
 
     return {
       status: true,
-      message: "Successfully deleted all conversations",
+      message: "All conversations and related data deleted successfully",
     };
-
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
 
     throw new AppError(
-      status.SERVICE_UNAVAILABLE,
-      error.message || "Issue while deleting conversations"
+      status.INTERNAL_SERVER_ERROR,
+      error.message || "Failed to delete conversations"
     );
   }
 };
 
 
 
-
-
-
-
-
-
-
 const ConversationService = {
   getConversation,
   allConversationIntoDb,
-   getSingleConversationListIntoDb,
-   getGroupConversationListIntoDb,
- createGroupConversationIntoDb,
- addedNewUserConversationIntoDb,
- delete_all_conversation_IntoDb
+  getSingleConversationListIntoDb,
+  getGroupConversationListIntoDb,
+  createGroupConversationIntoDb,
+  addedNewUserConversationIntoDb,
+  delete_all_conversation_IntoDb
 };
 
 export default ConversationService;

@@ -9,8 +9,15 @@ import config from "../../config";
 import QueryBuilder from "../../builder/QueryBuilder";
 import { TUser } from "../users/users.interface";
 import { ProfileUpdateResponse, RequestWithFile, user_search_filed } from './auth.constant';
-
-
+import path from "path";
+import fs from "fs/promises";
+import currentsubscriptions from "../current_subscription/current_subscription.model";
+import securefolders from "../secure_folder/secure_folder.model";
+import crypto from 'crypto';
+import securemediastores from "../secure_media_stores/secure_media_stores.model";
+import cryptoUtils from "../../utils/cryptoUtils/cryptoUtils";
+import conversations from "../conversation/conversation.model";
+import messages from "../message/message.model";
 const loginUserIntoDb = async (payload: {
   email: string;
   password: string;
@@ -26,7 +33,8 @@ const loginUserIntoDb = async (payload: {
     password: 1,
     email: 1,
     role: 1,
-    uid: 1
+    uid: 1,
+    photo:1
   });
 
   if (!user) {
@@ -247,41 +255,7 @@ const findByAllUsersAdminIntoDb = async (query: Record<string, unknown>) => {
 
 
 
-const deleteAccountIntoDb = async (id: string) => {
-  try {
-    const user = await users
-      .findOne({
-        _id: id,
-        isDelete: false,
-        isVerify: true,
-        status: USER_ACCESSIBILITY.isProgress,
-      })
-      .lean();
 
-    if (!user) {
-      throw new AppError(httpStatus.NOT_FOUND, "User account not found.");
-    }
-
-    if (user.role === USER_ROLE.superAdmin) {
-      throw new AppError(httpStatus.FORBIDDEN, "Super Admin cannot be deleted.");
-    }
-
-
-   
-
-    return {
-      status: true,
-      message: "User account and all related data deleted successfully.",
-    };
-  } catch (error:any) {
-    console.log("ACCOUNT DELETE ERROR =>", error); // DEBUG
-
-    throw new AppError(
-      httpStatus.INTERNAL_SERVER_ERROR,
-      error?.message || "Delete operation failed."
-    );
-  }
-};
 
 
 
@@ -486,7 +460,256 @@ const findBySpecificUserProfileIntoDb=async(userId:string)=>{
       error,
     );
     }
-}
+};
+
+
+const deleteLocalFile = async (filePath?: string) => {
+  if (!filePath) return;
+  try {
+    const localPath = path.resolve(filePath);
+    await fs.access(localPath);
+    await fs.unlink(localPath);
+  } catch {
+    // ignore if not exists
+  }
+};
+
+
+const deleteAccountIntoDb = async (id: string) => {
+  try {
+    const user = await users.findById(id).select("photo role privateKey").lean();
+
+    if (!user) {
+      throw new AppError(httpStatus.NOT_FOUND, "User account not found.");
+    }
+
+    if (user.role === USER_ROLE.superAdmin) {
+      throw new AppError(httpStatus.FORBIDDEN, "Super Admin cannot be deleted.");
+    };
+
+    if(user?.photo){
+
+      //await deleteLocalFile(user?.photo);
+      // delete aws account at a time 
+
+    };
+
+    // delete current subscription
+
+    // await currentsubscriptions.deleteMany({userId:id});
+
+    // delete secure folder 
+
+    // await securefolders.deleteMany({userId:id});
+
+
+     // 🔐 Fetch user private key
+       
+    
+        if (!user?.privateKey) {
+          throw new AppError(status.NOT_EXTENDED,"User private key not found");
+        }
+    
+    
+        const ecdh = crypto.createECDH("prime256v1");
+        ecdh.setPrivateKey(Buffer.from(user.privateKey, "base64"));
+    
+        // 📦 Query data (lean for performance)
+        const qb = new QueryBuilder(
+          securemediastores.find({ userId:id }).lean(),
+          {}
+        )
+          .search([])
+          .filter()
+          .sort()
+          .fields();
+    
+        const messagesMedia = await qb.modelQuery;
+        const decryptPayload = (
+          sharedSecret: Buffer,
+          payload?: { ciphertext: string; iv: string; tag: string }
+        ) => {
+          if (!payload) return null;
+          return cryptoUtils.decryptMessage(sharedSecret, payload);
+        };
+    
+        const decryptedMessages =messagesMedia.map((msg: any) => {
+          if (!msg.ephemPublicKey) {
+            return {
+              ...msg,
+              text: "[Missing ephem key]",
+            };
+          }
+    
+          try {
+            const sharedSecret = ecdh.computeSecret(
+              Buffer.from(msg.ephemPublicKey, "base64")
+            );
+    
+            return {
+              _id: msg._id,
+              userId: msg.userId,
+              createdAt: msg.createdAt,
+              updatedAt: msg.updatedAt,
+    
+              text: msg.text
+                ? decryptPayload(sharedSecret, msg.text)
+                : "",
+    
+              imageUrl: Array.isArray(msg.imageUrl)
+                ? msg.imageUrl.map((img: any) =>
+                    decryptPayload(sharedSecret, img)
+                  )
+                : [],
+    
+              audioUrl: decryptPayload(sharedSecret, msg.audioUrl),
+            };
+          } catch (err) {
+            console.error("Decryption failed for message:", msg._id, err);
+            return {
+              _id: msg._id,
+              error: "Unable to decrypt",
+            };
+          }
+        });
+
+      decryptedMessages?.map(async(media)=>{
+
+    if(media?.imageUrl?.length>=1){
+        
+       media?.imageUrl?.map(async(image:string)=>{
+
+        // await deleteLocalFile(image)
+          console.log(image);
+          // connected aws account and at a time connected mongodb database
+
+       });
+
+        if(media?.audioUrl){
+       //await deleteLocalFile()
+       // connected aws account a delete mongodb database ;
+       console.log(media?.audioUrl);
+    };
+    };
+   
+});
+
+
+// delete chatting conversation 
+
+const conversationDocs = await conversations
+      .find({ participants:id }, { _id: 1, participants: 1 })
+      .lean();
+
+    if (!conversationDocs.length) {
+      return { status: true, message: "No conversations found" };
+    }
+
+    const conversationIds = conversationDocs.map(c => c._id);
+
+/* --------------------------------------------------
+     🔑 Fetch all participant private keys
+    -------------------------------------------------- */
+    const participantIds = [
+      ...new Set(conversationDocs.flatMap(c => c.participants)),
+    ];
+
+    const privateKeyDocs = await users
+      .find({ _id: { $in: participantIds } })
+      .select("privateKey")
+      .lean();
+
+    const privateKeys = privateKeyDocs
+      .map(u => u.privateKey)
+      .filter(Boolean);
+
+   /* --------------------------------------------------
+     📦 Fetch messages for media cleanup
+    -------------------------------------------------- */
+    const messageDocs = await messages.find({ conversationId: { $in: conversationIds } })
+      .select("ephemPublicKey imageUrl audioUrl")
+      .lean();
+
+/* --------------------------------------------------
+     🧹 Decrypt & delete media files
+    -------------------------------------------------- */
+    for (const msg of messageDocs) {
+      if (!msg.ephemPublicKey) continue;
+
+      const ephemKeyBuffer = Buffer.from(msg.ephemPublicKey, "base64");
+
+      for (const privateKey of privateKeys) {
+        try {
+          const ecdh = crypto.createECDH("prime256v1");
+          ecdh.setPrivateKey(Buffer.from(privateKey, "base64"));
+
+          const sharedSecret = ecdh.computeSecret(ephemKeyBuffer);
+
+          // 🖼 Delete images
+          if (Array.isArray(msg.imageUrl)) {
+            for (const img of msg.imageUrl) {
+              const decryptedPath =
+                cryptoUtils.decryptMessage(sharedSecret, img);
+              // deleteLocalFile(decryptedPath);
+              //console.log("............decryptedPath image ...........");
+              // deleteLocalFile(decryptedPath);
+              //console.log(decryptedPath)
+              // connected aws account at a time database delete
+            }
+          }
+
+          // 🎧 Delete audio
+          if (msg.audioUrl) {
+            const decryptedAudio =
+              cryptoUtils.decryptMessage(sharedSecret, msg.audioUrl);
+
+             //console.log("............decrypted Audio ...........");
+              //deleteLocalFile(decryptedAudio);
+
+            // deleteLocalFile(decryptedAudio);
+            // connected aws account at a time database delete
+          }
+
+          break; // ✅ correct key found
+        } catch {
+          continue; // ❌ try next private key
+        }
+      }
+    };
+
+    /* --------------------------------------------------
+     🗑 Delete messages & conversations
+    -------------------------------------------------- */
+    // await messages.deleteMany(
+    //   { conversationId: { $in: conversationIds } }
+    // );
+
+    // await conversations.deleteMany(
+    //   { _id: { $in: conversationIds } }
+    // );
+
+    if(user?.photo){
+       // deleteLocalFile(user?.photo);
+    }
+     //await users.findByIdAndDelete(id);
+
+
+
+
+    return {
+      status: true,
+      message: "User account and all related data deleted successfully.",
+    };
+  } catch (error:any) {
+    console.log("ACCOUNT DELETE ERROR =>", error); // DEBUG
+
+    throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      error?.message || "Delete operation failed."
+    );
+  }
+};
+
 
 const AuthServices = {
   loginUserIntoDb,
