@@ -626,6 +626,30 @@ const deleteAccountIntoDb = async (id: string) => {
 };
 
 
+const dashboardEntityCountIntoDb=async()=>{
+
+
+     try{
+
+
+        const userCount= await  users.countDocuments();
+
+        const currentSubscriber=await currentsubscriptions.countDocuments();
+
+        return {
+          userCount, currentSubscriber
+        }
+
+     }
+     catch(error:any){
+          throw new AppError(
+      httpStatus.INTERNAL_SERVER_ERROR,
+      error.message || "Delete failed"
+    );
+     }
+}
+
+
 
 const AuthServices = {
   loginUserIntoDb,
@@ -639,7 +663,8 @@ const AuthServices = {
   isBlockAccountIntoDb,
   recoveryKeyIntoDb,
   findByAllUserChatListIntoDb,
-  findBySpecificUserProfileIntoDb
+  findBySpecificUserProfileIntoDb,
+  dashboardEntityCountIntoDb
 };
 
 export default AuthServices;

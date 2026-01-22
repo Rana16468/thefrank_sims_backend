@@ -24,6 +24,10 @@ const TSubscriptionSchema = new Schema<TSubscription, SubscriptionModel>(
         type: [String],
         required: true,
       },
+      price:{
+        type:String,
+        require:false
+      }
     },
 
     subscriptionType15: {
@@ -35,6 +39,10 @@ const TSubscriptionSchema = new Schema<TSubscription, SubscriptionModel>(
         type: [String],
         required: true,
       },
+       price:{
+        type:String,
+        require:false
+      }
     },
 
  subscriptionPrice: [

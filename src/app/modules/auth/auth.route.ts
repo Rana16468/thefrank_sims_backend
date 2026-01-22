@@ -80,10 +80,8 @@ router.patch(
 );
 
 router.post("/recoveryKey", validationRequest(LoginValidationSchema. recoveryKeySchema), AuthController.recoveryKey);
-
 router.get("/find_by_all_user_chat_list", auth(USER_ROLE.user), AuthController.findByAllUserChatList);
 router.get("/find_by_specific_user_profile/:userId", auth(USER_ROLE.user), AuthController.findBySpecificUserProfile);
-
-
+router.get("/dashboard_entity_count", auth(USER_ROLE.admin), AuthController.dashboardEntityCount);
 const AuthRouter = router;
 export default AuthRouter;

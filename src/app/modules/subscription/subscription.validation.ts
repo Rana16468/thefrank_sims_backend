@@ -8,11 +8,13 @@ const createSubscriptionValidation = z.object({
     subscriptionType30: z.object({
       title: z.string(),
       features: z.array(z.string()),
+      price:z.string().optional()
     }),
 
     subscriptionType15: z.object({
       title: z.string(),
       features: z.array(z.string()),
+      price:z.string().optional()
     }),
 
     subscriptionPrice: z.array(
@@ -34,11 +36,13 @@ const updateSubscriptionValidation = z.object({
     subscriptionType30: z.object({
       title: z.string().optional(),
       features: z.array(z.string()).optional(),
+      price: z.string().optional()
     }).optional(),
 
     subscriptionType15: z.object({
       title: z.string().optional(),
       features: z.array(z.string()).optional(),
+      price: z.string().optional()
     }).optional(),
 
     subscriptionPrice: z.array(

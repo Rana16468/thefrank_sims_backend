@@ -144,6 +144,19 @@ const findBySpecificUserProfile:RequestHandler=catchAsync(async(req , res)=>{
 });
 
 
+const dashboardEntityCount:RequestHandler=catchAsync(async(req , res)=>{
+
+    const result=await AuthServices.dashboardEntityCountIntoDb();
+      sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Successfully Fine All Data",
+    data: result,
+  });
+
+})
+
+
 
 
 
@@ -160,7 +173,8 @@ const AuthController = {
    getUserGrowth,
     recoveryKey,
     findByAllUserChatList,
-     findBySpecificUserProfile
+     findBySpecificUserProfile,
+     dashboardEntityCount
 
 };
 

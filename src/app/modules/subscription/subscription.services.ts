@@ -53,9 +53,36 @@ const createSubscriptionIntoDb=async(payload:TSubscription)=>{
    }
 }
 
+ const updateSubscriptionIntoDb=async(id:string, payload:TSubscription )=>{
+
+
+    try{
+
+        const result=await subscriptions.findByIdAndUpdate(id, payload,{new:true, upsert:true});
+
+        if(!result){
+          throw new AppError(status.NOT_EXTENDED, 'issues  by the  subscription update section')
+        }
+
+         return {
+          status:true , message:"successfully update"
+         }
+         
+
+    }
+    catch (error: any) {
+    throw new AppError(
+      status.SERVICE_UNAVAILABLE,
+      "find By All Subscription IntoDb server unavailable",
+      error,
+    );
+   }
+ }
+
 
 const subscriptionServices={
     createSubscriptionIntoDb,
-    findByAllSubscriptionIntoDb
+    findByAllSubscriptionIntoDb,
+    updateSubscriptionIntoDb
 };
 export default subscriptionServices

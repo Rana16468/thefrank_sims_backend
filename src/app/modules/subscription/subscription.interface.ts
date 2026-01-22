@@ -7,11 +7,13 @@ export interface TSubscription {
      description: string;
      subscriptionType30:{
         title:string;
-        features:string[]
+        features:string[],
+        price:string
      };
        subscriptionType15:{
         title:string;
-        features:string[]
+        features:string[],
+        price:string
      },
      subscriptionPrice: {pricetype:string}[]
      isDelete:Boolean;

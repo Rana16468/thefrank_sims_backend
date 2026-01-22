@@ -27,10 +27,25 @@ const findByAllSubscription:RequestHandler=catchAsync(async(req , res)=>{
          message: "Successfully Find By All Subscription",
          data: result,
        });
-})
+});
+
+
+const updateSubscription:RequestHandler=catchAsync(async(req , res)=>{
+
+
+    const result=await subscriptionServices.updateSubscriptionIntoDb(req.params.id, req.body);
+     sendResponse(res, {
+         success: true,
+         statusCode: status.OK,
+         message: "Successfully  Updated By The Subscription",
+         data: result,
+       });
+});
+
 
 const subscriptionController={
     createSubscription,
-    findByAllSubscription
+    findByAllSubscription,
+    updateSubscription
 };
 export default subscriptionController;
