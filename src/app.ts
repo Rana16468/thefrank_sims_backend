@@ -16,16 +16,12 @@ const app: Application = express();
 
 // parsers
 app.use(express.json());
-app.use(
-  cors({
-    origin: [""],
-    credentials: true,
-  })
-);
+
 app.use(
   config.file_path as string,
   express.static(path.join(__dirname, 'public')),
 );
+app.use(cors())
 
 
 app.use(cookieParser());
@@ -77,6 +73,5 @@ app.use(notFound);
 export default app;
 
 // here is my6 aws ubuntu  server
-
 // infos@DESKTOP-2PEJ0GR MINGW64 ~/.ssh
 // $  ssh -i thefrank_sims_ssh ubuntu@16.171.28.93
