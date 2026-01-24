@@ -179,6 +179,7 @@ const chnagePasswordIntoDb = async (
       throw new AppError(httpStatus.NOT_FOUND, 'User not found', '');
     }
 
+ 
     if (
       !(await users.isPasswordMatched(
         payload.oldpassword,
@@ -192,10 +193,14 @@ const chnagePasswordIntoDb = async (
       );
     }
 
+  
+
     const newHashedPassword = await bcrypt.hash(
       payload.newpassword,
       Number(config.bcrypt_salt_rounds),
     );
+
+    console.log("sdfa",newHashedPassword)
 
     const updatedUser = await users.findByIdAndUpdate(
       id,

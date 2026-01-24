@@ -18,4 +18,10 @@ export default {
   refresh_expires_in: process.env.REFRESH_EXPIRES_IN,
   file_path: process.env.FILE_PATH,
   host: process.env.HOST,
+    s3_bucket: {
+    aws_bucket_accesskey: process.env.AWS_BUCKET_ACCESS_KEY,
+    aws_bucket_secret_key: process.env.AWS_BUCKET_SECRET_KEY,
+    aws_bucket_region: process.env.AWS_BUCKET_REGION,
+    aws_bucket_name: process.env.AWS_BUCKET_NAME,
+  },
 };
