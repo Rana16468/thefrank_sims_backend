@@ -18,6 +18,7 @@ import securemediastores from "../secure_media_stores/secure_media_stores.model"
 import cryptoUtils from "../../utils/cryptoUtils/cryptoUtils";
 import conversations from "../conversation/conversation.model";
 import messages from "../message/message.model";
+import { uploadToS3 } from "../../utils/uploadToS3";
 const loginUserIntoDb = async (payload: {
   email: string;
   password: string;
@@ -182,7 +183,7 @@ const changeMyProfileIntoDb = async (
     }
     
     if (file) {
-      updateData.photo = file?.path?.replace(/\\/g, "/");
+      updateData.photo = await uploadToS3(file, config.file_path);
     }
 
     if (Object.keys(updateData).length === 0) {
