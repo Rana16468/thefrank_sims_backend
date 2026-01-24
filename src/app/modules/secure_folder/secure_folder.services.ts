@@ -291,7 +291,9 @@ const uploadContentSecureFolderIntoDb = async (
         // Encrypt images (if exists)
         let imageUrlEncrypted: { ciphertext: string; iv: string; tag: string }[] = [];
         if (Array.isArray(payload.imageUrl) && payload.imageUrl.length > 0) {
+
           imageUrlEncrypted = payload.imageUrl.map((img:any) =>
+           
             cryptoUtils.encryptMessage(sharedSecret, img)
           );
         }

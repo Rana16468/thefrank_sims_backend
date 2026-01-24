@@ -7,19 +7,21 @@ import status from 'http-status';
 import validationRequest from '../../middlewares/validationRequest';
 import SecureMediaStoresValidation from './secure_media_stores.validation';
 import SecureMediaStoresController from './secure_media_stores.controllers';
+import { uploadToS3 } from '../../utils/uploadToS3';
+import config from '../../config';
 
 const routes=express.Router();
 
 routes.post(
   '/upload_media_file',
   auth(USER_ROLE.user,USER_ROLE.admin,USER_ROLE.superAdmin),
-  upload.fields([
-    { name: 'imageUrl', maxCount: 10 },
-    { name: 'audioUrl', maxCount: 1 },
+ upload.fields([
+    { name: "imageUrl", maxCount: 10 },
+    { name: "audioUrl", maxCount: 1 },
   ]),
-  (req: Request, _res: Response, next: NextFunction) => {
+  async (req: Request, _res: Response, next: NextFunction) => {
     try {
-      if (req.body.data && typeof req.body.data === 'string') {
+      if (req.body.data && typeof req.body.data === "string") {
         req.body = JSON.parse(req.body.data);
       }
 
@@ -27,27 +29,41 @@ routes.post(
         [fieldname: string]: Express.Multer.File[];
       };
 
-      // Handle image uploads if they exist
+      // ✅ Upload images to S3
       if (files?.imageUrl) {
-        // Store paths of uploaded images
-        req.body.imageUrl = files.imageUrl.map((file) =>
-          file.path.replace(/\\/g, '/'),
+        const uploadedImages = await Promise.all(
+          files.imageUrl.map((file) =>
+          {
+
+            const result=uploadToS3(file, config.file_path);
+
+               console.log(".....................result ............")
+               console.log(result);
+          
+            return result
+          }
+          )
         );
+        req.body.imageUrl = uploadedImages; // now S3 URLs
       }
 
+      // ✅ Upload audio to S3
       if (files?.audioUrl && files.audioUrl.length > 0) {
-        const audioPaths = files.audioUrl.map((file) =>
-          file.path.replace(/\\/g, '/'),
+        const uploadedAudios = await Promise.all(
+          files.audioUrl.map((file) =>
+            uploadToS3(file, config.file_path)
+          )
         );
 
         req.body.audioUrl =
-        audioPaths.length === 1 ? audioPaths[0] : audioPaths;
-       
+          uploadedAudios.length === 1
+            ? uploadedAudios[0]
+            : uploadedAudios;
       }
 
       next();
     } catch (error: any) {
-      next(new AppError(status.BAD_REQUEST, 'Invalid JSON data', error));
+      next(new AppError(status.BAD_REQUEST, "Upload failed", error));
     }
   },
   validationRequest(SecureMediaStoresValidation.secureFolderMediaFileSchema),
