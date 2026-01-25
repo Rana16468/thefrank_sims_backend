@@ -14,6 +14,7 @@ import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
 import crypto from 'crypto';
 import fs from "fs/promises";
 import path from "path";
+import { deleteFromS3 } from '../../utils/deleteFromS3';
 
 
 
@@ -405,7 +406,9 @@ const delete_all_conversation_IntoDb = async (userId: string) => {
             for (const img of msg.imageUrl) {
               const decryptedPath =
                 cryptoUtils.decryptMessage(sharedSecret, img);
-              deleteLocalFile(decryptedPath);
+              // deleteLocalFile(decryptedPath);
+              deleteFromS3(decryptedPath);
+               
             }
           }
 
@@ -413,7 +416,8 @@ const delete_all_conversation_IntoDb = async (userId: string) => {
           if (msg.audioUrl) {
             const decryptedAudio =
               cryptoUtils.decryptMessage(sharedSecret, msg.audioUrl);
-            deleteLocalFile(decryptedAudio);
+            // deleteLocalFile(decryptedAudio);
+             deleteFromS3(decryptedAudio);
           }
 
           break; // ✅ correct key found
@@ -426,15 +430,15 @@ const delete_all_conversation_IntoDb = async (userId: string) => {
     /* --------------------------------------------------
      🗑 Delete messages & conversations
     -------------------------------------------------- */
-    await messages.deleteMany(
-      { conversationId: { $in: conversationIds } },
-      { session }
-    );
+    // await messages.deleteMany(
+    //   { conversationId: { $in: conversationIds } },
+    //   { session }
+    // );
 
-    await conversations.deleteMany(
-      { _id: { $in: conversationIds } },
-      { session }
-    );
+    // await conversations.deleteMany(
+    //   { _id: { $in: conversationIds } },
+    //   { session }
+    // );
 
     await session.commitTransaction();
     session.endSession();

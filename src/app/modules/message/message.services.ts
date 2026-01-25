@@ -341,8 +341,9 @@ const deleteMessageById_IntoDb = async (
         const url = decryptPayload(img);
         if (url) filesToDelete.push(url);
       }
-    }
+    };
 
+  
     if (message.audioUrl) {
       const url = decryptPayload(message.audioUrl);
       if (url) filesToDelete.push(url);

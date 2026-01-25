@@ -19,6 +19,7 @@ import cryptoUtils from "../../utils/cryptoUtils/cryptoUtils";
 import conversations from "../conversation/conversation.model";
 import messages from "../message/message.model";
 import { uploadToS3 } from "../../utils/uploadToS3";
+import { deleteFromS3 } from "../../utils/deleteFromS3";
 const loginUserIntoDb = async (payload: {
   email: string;
   password: string;
@@ -467,9 +468,12 @@ const findBySpecificUserProfileIntoDb=async(userId:string)=>{
 const deleteLocalFile = async (filePath?: string) => {
   if (!filePath) return;
   try {
-    const localPath = path.resolve(filePath);
-    await fs.access(localPath);
-    await fs.unlink(localPath);
+
+    await deleteFromS3(filePath);
+
+    // const localPath = path.resolve(filePath);
+    // await fs.access(localPath);
+    // await fs.unlink(localPath);
   } catch {
     // ignore if not exists
   }
