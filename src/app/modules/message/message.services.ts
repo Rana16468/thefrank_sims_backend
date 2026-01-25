@@ -302,7 +302,7 @@ const deleteMessageById_IntoDb = async (
         👤 Load MESSAGE OWNER (sender)
     ----------------------------- */
     const owner = await users
-      .findById(message.msgByUserId) // ✅ MUST be sender
+      .findById(message.receiverId) // ✅ MUST be sender
       .select("privateKey")
       .lean<{ privateKey: string }>();
 
@@ -314,7 +314,7 @@ const deleteMessageById_IntoDb = async (
         🔐 Prepare ECDH
     ----------------------------- */
     const ecdh = crypto.createECDH("prime256v1");
-    ecdh.setPrivateKey(Buffer.from("/qW04wZKbSna1ohCacr48TTzhbzYHx9A2EcOgq9LGgY=", "base64"));
+    ecdh.setPrivateKey(Buffer.from(owner?.privateKey, "base64"));
 
     const sharedSecret = ecdh.computeSecret(
       Buffer.from(message.ephemPublicKey, "base64")
@@ -352,14 +352,11 @@ const deleteMessageById_IntoDb = async (
         🗑 Delete files (S3)
     ----------------------------- */
     for (const fileUrl of filesToDelete) {
-      console.log("Deleting:", fileUrl);
-      // await deleteFromS3(fileUrl);
+      
+      await deleteFromS3(fileUrl);
     }
 
-    /* ----------------------------
-        🗑 Delete message
-    ----------------------------- */
-    // await messages.deleteOne({ _id: messageId }).session(session);
+    await messages.deleteOne({ _id: messageId }).session(session);
 
     await session.commitTransaction();
     session.endSession();

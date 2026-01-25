@@ -1,5 +1,5 @@
 import config from "../config";
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import {  DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { s3 } from "./uploadToS3";
 
 export const deleteFromS3 = async (fileUrl: string): Promise<boolean> => {
