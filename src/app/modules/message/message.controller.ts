@@ -35,7 +35,7 @@ const updateMessageById: RequestHandler = catchAsync(async (req, res) => {
 
 const deleteMessageById: RequestHandler = catchAsync(async (req, res) => {
   const result = await MessageService.deleteMessageById_IntoDb(
-    req.params.messageId,
+    req.params.messageId, req.user.id
   );
   sendResponse(res, {
     statusCode: httpStatus.OK,

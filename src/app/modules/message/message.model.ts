@@ -45,6 +45,11 @@ const messageSchema = new Schema<IMessage>(
       required: false,
       ref: 'conversations',
     },
+    receiverId:{
+      type: mongoose.Schema.Types.ObjectId,
+      required: false,
+      ref: 'users'
+    }
   },
   {
     timestamps: true,

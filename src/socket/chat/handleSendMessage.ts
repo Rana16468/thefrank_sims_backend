@@ -130,6 +130,7 @@ export const handleSendMessage = async (
           msgByUserId: new mongoose.Types.ObjectId(currentUserId),
           conversationId: conversation._id,
           seen: false,
+          receiverId: data.receiverId,
           createdAt: new Date(),
         },
       ],

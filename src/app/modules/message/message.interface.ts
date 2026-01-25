@@ -20,6 +20,7 @@ export interface IMessage {
      ephemPublicKey: string,
       msgByUserId: Types.ObjectId;
        conversationId: Types.ObjectId;
+       receiverId: Types.ObjectId
 }
 
 // 🔹 Payload for creating a new message

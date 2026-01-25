@@ -99,6 +99,7 @@ export const handleSingleSendMessage = async (
           msgByUserId: new mongoose.Types.ObjectId(currentUserId),
           conversationId: conversation._id,
           seen: false,
+          receiverId: data.receiverId
         },
       ],
       { session }

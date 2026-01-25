@@ -14,6 +14,7 @@ import { CHAT_TYPE } from '../conversation/conversation.constant';
 import users from '../users/users.model';
 import crypto from 'crypto';
 import cryptoUtils from '../../utils/cryptoUtils/cryptoUtils';
+import { deleteFromS3 } from '../../utils/deleteFromS3';
 
 
 interface JwtPayloads {
@@ -128,6 +129,7 @@ interface NewMessagePayload {
           ephemPublicKey: ephem.getPublicKey().toString("base64"),
           msgByUserId: new mongoose.Types.ObjectId(user.id),
           conversationId: conversation._id,
+          receiverId: data.receiverId
         },
       ],
       { session }
@@ -273,65 +275,117 @@ const updateMessageById_IntoDb = async (
 };
 
 
-const deleteMessageById_IntoDb = async (messageId: string) => {
+const deleteMessageById_IntoDb = async (
+  messageId: string,
+  userId: string
+) => {
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    /* ----------------------------
+        💬 Load message
+    ----------------------------- */
     const message = await messages.findById(messageId).session(session);
+    console.log(message);
+    
+
     if (!message) {
-      throw new AppError(httpStatus.NOT_FOUND, "Message not found", "");
+      throw new AppError(httpStatus.NOT_FOUND, "Message not found");
     }
 
-    const conversationId = message.conversationId;
-
-
-    await message.deleteOne({ _id: messageId }).session(session);
-
-    const conversation = await conversations.findById(conversationId).session(session);
-    if (!conversation) {
-      throw new AppError(httpStatus.NOT_FOUND, "Conversation not found", "");
+    if (!message.ephemPublicKey) {
+      throw new AppError(httpStatus.BAD_REQUEST, "Missing ephemPublicKey");
     }
 
- 
-    if (conversation.lastMessage?.toString() === messageId.toString()) {
-      const newLastMessage = await messages.findOne({ conversationId })
-        .sort({ createdAt: -1 })
-        .session(session);
+    /* ----------------------------
+        👤 Load MESSAGE OWNER (sender)
+    ----------------------------- */
+    const owner = await users
+      .findById(message.msgByUserId) // ✅ MUST be sender
+      .select("privateKey")
+      .lean<{ privateKey: string }>();
 
-
-      conversation.lastMessage = newLastMessage ? newLastMessage._id : null;
-      await conversation.save({ session });
+    if (!owner?.privateKey) {
+      throw new AppError(httpStatus.NOT_FOUND, "Sender private key not found");
     }
+
+    /* ----------------------------
+        🔐 Prepare ECDH
+    ----------------------------- */
+    const ecdh = crypto.createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from("/qW04wZKbSna1ohCacr48TTzhbzYHx9A2EcOgq9LGgY=", "base64"));
+
+    const sharedSecret = ecdh.computeSecret(
+      Buffer.from(message.ephemPublicKey, "base64")
+    );
+
+    const filesToDelete: string[] = [];
+
+    const decryptPayload = (
+      payload?: { ciphertext: string; iv: string; tag: string }
+    ): string | null => {
+
+   
+
+      if (!payload) return null;
+      return cryptoUtils.decryptMessage(sharedSecret, payload);
+    };
+
+   
+
+    if (Array.isArray(message.imageUrl)) {
+      for (const img of message.imageUrl) {
+        console.log("img", img);
+
+        const url = decryptPayload(img);
+        if (url) filesToDelete.push(url);
+      }
+    }
+
+    if (message.audioUrl) {
+      const url = decryptPayload(message.audioUrl);
+      if (url) filesToDelete.push(url);
+    }
+
+    /* ----------------------------
+        🗑 Delete files (S3)
+    ----------------------------- */
+    for (const fileUrl of filesToDelete) {
+      console.log("Deleting:", fileUrl);
+      // await deleteFromS3(fileUrl);
+    }
+
+    /* ----------------------------
+        🗑 Delete message
+    ----------------------------- */
+    // await messages.deleteOne({ _id: messageId }).session(session);
 
     await session.commitTransaction();
     session.endSession();
-
-    const io = getSocketIO();
-    conversation?.participants?.forEach((participantId) => {
-      io.to(participantId.toString()).emit("message-deleted", {
-        messageId,
-        conversationId,
-      });
-    }); 
-
-   
 
     return {
       success: true,
       message: "Message deleted successfully",
       messageId,
+      deletedFiles: filesToDelete,
     };
   } catch (error: any) {
     await session.abortTransaction();
     session.endSession();
+
     throw new AppError(
       httpStatus.INTERNAL_SERVER_ERROR,
-      "Error deleting message",
-      error,
+      error.message || "Error deleting message",
+      error
     );
   }
 };
+
+
+
+
+
 
 
 const findBySpecificConversationInDb = async (
@@ -490,6 +544,7 @@ const single_new_message_IntoDb = async (
       eventId: data.currentSubId || null,
       msgByUserId: senderId, // always provided
       conversationId: conversation._id,
+      receiverId: data.receiverId
     };
 
     const savedMessage = await messages.create(messageData);
