@@ -7,12 +7,12 @@
     "ts-express-kit": "./dist/bin/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "node init && tsc",
     "lint": "eslint src --ignore-path .eslintignore --ext .ts",
     "lint:fix": "npx eslint src --fix",
     "prettier": "prettier --ignore-path .gitignore --write \"./src/**/*.+(js|ts|json)\"",
     "prettier:fix": "npx prettier --write src",
-    "dev": "ts-node-dev --respawn --transpile-only ./src/server.ts",
+    "dev": "node init && ts-node-dev --respawn --transpile-only ./src/server.ts",
     "prod": "node ./dist/server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -42,6 +42,7 @@
     "mongoose": "^8.19.4",
     "multer": "^2.0.2",
     "node-cron": "^4.2.1",
+    "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.10",
     "socket.io": "^4.8.1",
     "uuid": "^13.0.0",
